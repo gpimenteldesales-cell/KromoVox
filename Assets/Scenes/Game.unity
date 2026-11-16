@@ -419,7 +419,7 @@ MonoBehaviour:
   distanciaMinInicial: 0.3
   distanciaMinFinal: 0.12
   rodadasAteDistanciaFinal: 12
-  playerTransform: {fileID: 0}
+  playerTransform: {fileID: 1658480748}
   alturaRaio: 1
   tempoInicial: 10
   tempoMinimo: 3
@@ -436,6 +436,10 @@ MonoBehaviour:
   corBlocosApagados: {r: 0.25, g: 0.25, b: 0.3, a: 1}
   duracaoRevelacao: 0.6
   atrasoGameOver: 0.9
+  duracaoOndaMax: 0.4
+  fracaoOndaDaRodada: 0.15
+  tiqueTaque: 1
+  segundosDeTique: 3
   onRoundWon:
     m_PersistentCalls:
       m_Calls:
@@ -1987,8 +1991,7 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 1766263760}
+  m_Children: []
   m_Father: {fileID: 2112542970}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &762654833
@@ -3078,7 +3081,7 @@ GameObject:
   - component: {fileID: 1342317110}
   - component: {fileID: 1342317109}
   m_Layer: 0
-  m_Name: MusicControl
+  m_Name: AudioManager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3315,6 +3318,74 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1427552878}
   m_CullTransparentMesh: 1
+--- !u!1 &1439116383
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1439116384}
+  - component: {fileID: 1439116385}
+  m_Layer: 0
+  m_Name: Tutorial
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1439116384
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1439116383}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -1406.5677, y: 14.648231, z: 5864.292}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2112542970}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1439116385
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1439116383}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 386e7b56c3b67e84fbb1f7ce78f8b55d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialOverlay
+  forcarMostrar: 1
+  atrasoInicial: 0.9
+  titulo1: FIND THE COLOR
+  texto1: Stand on the tile that matches the TARGET color at the top of the screen.
+  rotuloAlvo: TARGET
+  rotuloIgual: MATCH!
+  titulo2: MOVE YOUR CUBE
+  texto2: Use WASD or the ARROW KEYS. Try them now!
+  rotuloOu: OR
+  titulo3: BEAT THE CLOCK
+  texto3: When the timer ends, you must be standing on the matching tile. Every round
+    is faster!
+  rodapeProximo: 'SPACE / CLICK: NEXT  |  ESC: SKIP'
+  rodapeComecar: 'SPACE / CLICK: START'
+  font: {fileID: 11400000, guid: 45a9d96e27149a2459637c969df74209, type: 2}
+  sortingOrder: 100
+  corDim: {r: 0, g: 0, b: 0, a: 0.62}
+  corCard: {r: 0.1, g: 0.08, b: 0.18, a: 0.97}
+  corBorda: {r: 0.43, g: 0.25, b: 1, a: 1}
+  corDestaque: {r: 0.24, g: 0.86, b: 0.52, a: 1}
+  corPerigo: {r: 0.95, g: 0.25, b: 0.25, a: 1}
+  corTecla: {r: 0.22, g: 0.19, b: 0.34, a: 1}
+  corTrilho: {r: 0.04, g: 0.02, b: 0.09, a: 1}
+  corTextoSuave: {r: 1, g: 1, b: 1, a: 0.82}
 --- !u!1 &1463017753
 GameObject:
   m_ObjectHideFlags: 0
@@ -4237,6 +4308,7 @@ GameObject:
   - component: {fileID: 1658480745}
   - component: {fileID: 1658480744}
   - component: {fileID: 1658480749}
+  - component: {fileID: 1658480750}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -4379,6 +4451,27 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
   velocidade: 40
   referenciaCamera: {fileID: 330585546}
+--- !u!114 &1658480750
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1658480743}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a764e5271c8305c459dfb2f8cefae39a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerJuice
+  visual: {fileID: 0}
+  impulsoInicio: -2.2
+  impulsoParada: 1.4
+  mola: 220
+  amortecimento: 16
+  balanco: 0.04
+  frequenciaBalanco: 11
+  respiracao: 0.012
+  pulsoNaBatida: 0.025
 --- !u!1 &1709408002
 GameObject:
   m_ObjectHideFlags: 0
@@ -4659,7 +4752,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 762654832}
+  m_Father: {fileID: 2112542970}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1766263761
 MonoBehaviour:
@@ -5242,9 +5335,11 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1342317110}
+  - {fileID: 1439116384}
   - {fileID: 762654832}
   - {fileID: 207147558}
   - {fileID: 1107809892}
+  - {fileID: 1766263760}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2144461003

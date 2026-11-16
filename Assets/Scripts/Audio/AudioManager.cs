@@ -43,6 +43,11 @@ public class AudioManager : MonoBehaviour
     public AudioClip correct;      // ui_correct (cor certa)
     public AudioClip jingle;       // hook_jingle
 
+    [Header("Tique (últimos segundos da rodada)")]
+    [Tooltip("Opcional. Se vazio, o tique é gerado por código (um 'toc' curto e suave).")]
+    public AudioClip tick;
+    [Range(0f, 1f)] public float tickVolume = 0.45f;
+
     [Header("Notas das cores (vermelho, amarelo, verde, ciano, azul, roxo)")]
     public AudioClip[] colorNotes;
 
@@ -143,6 +148,8 @@ public class AudioManager : MonoBehaviour
         _cutoff = _cutoffTarget = openCutoff;
         BuildLayers();
         BuildSfxPool();
+
+        if (tick == null) tick = CriarTick();
     }
 
     void Start()
@@ -369,6 +376,7 @@ public class AudioManager : MonoBehaviour
     public void PlayError() => Play(error, 0.02f, 0.05f);
     public void PlayCorrect() => Play(correct, 0.015f, 0.05f);
     public void PlayJingle() => Play(jingle, 0f, 0f);
+    public void PlayTick() => Play(tick, 0.01f, 0.05f, tickVolume);
 
     /// <summary>Toca a nota da cor (0 vermelho, 1 amarelo, 2 verde, 3 ciano, 4 azul, 5 roxo).</summary>
     public void PlayColorNote(int colorIndex)
@@ -380,7 +388,27 @@ public class AudioManager : MonoBehaviour
         Play(colorNotes[i], 0.003f, 0.08f);
     }
 
-    void Play(AudioClip clip, float pitchJitter, float volumeJitter)
+    /// <summary>"Toc" curto e suave (seno com queda rápida), usado se nenhum clip de tique foi definido.</summary>
+    static AudioClip CriarTick()
+    {
+        const int sampleRate = 44100;
+        int n = Mathf.RoundToInt(sampleRate * 0.06f);
+        var data = new float[n];
+
+        for (int i = 0; i < n; i++)
+        {
+            float t = i / (float)sampleRate;
+            float envelope = Mathf.Exp(-t * 80f);
+            float ataque = Mathf.Clamp01(i / 40f);        // evita o "clique" do início seco
+            data[i] = Mathf.Sin(2f * Mathf.PI * 1250f * t) * envelope * ataque * 0.55f;
+        }
+
+        var clip = AudioClip.Create("tick", n, 1, sampleRate, false);
+        clip.SetData(data, 0);
+        return clip;
+    }
+
+    void Play(AudioClip clip, float pitchJitter, float volumeJitter, float gain = 1f)
     {
         if (clip == null || _pool == null) return;
 
@@ -401,7 +429,7 @@ public class AudioManager : MonoBehaviour
         var s = _pool[idx];
         s.clip = clip;
         s.pitch = 1f + UnityEngine.Random.Range(-pitchJitter, pitchJitter);
-        s.volume = Mathf.Clamp01(master * sfx * (1f + UnityEngine.Random.Range(-volumeJitter, volumeJitter)));
+        s.volume = Mathf.Clamp01(master * sfx * gain * (1f + UnityEngine.Random.Range(-volumeJitter, volumeJitter)));
         s.Play();
         _poolTime[idx] = Time.unscaledTime;
     }

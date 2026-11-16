@@ -84,6 +84,20 @@ public class GameManager : MonoBehaviour
     [Tooltip("Espera antes de mostrar o painel de Game Over, para o jogador ver o bloco certo.")]
     public float atrasoGameOver = 0.9f;
 
+    [Header("Vida no tabuleiro")]
+    [Tooltip("Duração máxima da onda que acende os tiles no começo de cada rodada. 0 = desliga (as cores aparecem de uma vez).")]
+    public float duracaoOndaMax = 0.40f;
+
+    [Tooltip("Limite da onda como fração da rodada, para ela nunca roubar muito tempo em rodadas curtas.")]
+    [Range(0f, 0.5f)]
+    public float fracaoOndaDaRodada = 0.15f;
+
+    [Tooltip("Tique discreto, na batida da música, nos últimos segundos da rodada.")]
+    public bool tiqueTaque = true;
+
+    [Tooltip("Quantos segundos finais da rodada têm o tique.")]
+    public float segundosDeTique = 3f;
+
     [Header("Eventos")]
     public UnityEvent onRoundWon;
     public UnityEvent onRoundLost;
@@ -105,6 +119,9 @@ public class GameManager : MonoBehaviour
     private Coroutine timerCoroutine;
     private Coroutine derrotaCoroutine;
     private Coroutine fundoCoroutine;
+    private Coroutine ondaCoroutine;
+
+    private Vector3 centroTabuleiro;
 
     private bool roundActive;
     private int rodada;
@@ -202,6 +219,12 @@ public class GameManager : MonoBehaviour
         }
 
         tempoAtual = tempoInicial;
+
+        // Centro do tabuleiro: de onde a onda de revelação parte.
+        Vector3 soma = Vector3.zero;
+        foreach (GridBlock b in blocks)
+            soma += b.transform.position;
+        centroTabuleiro = soma / blocks.Count;
     }
 
     private void Start()
@@ -236,7 +259,17 @@ public class GameManager : MonoBehaviour
         }
 
         // Em vez de valer já no primeiro frame, o jogo começa com um preparo calmo.
+        // Tique na batida da música (o AudioManager vive entre cenas: desinscreve no OnDestroy).
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.OnBeat += AoBater;
+
         IniciarPreparo(tempoPreparo);
+    }
+
+    private void OnDestroy()
+    {
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.OnBeat -= AoBater;
     }
 
     // =========================================================
@@ -245,6 +278,8 @@ public class GameManager : MonoBehaviour
 
     private void IniciarPreparo(float duracao)
     {
+        PararOnda();
+
         if (preparoCoroutine != null)
         {
             StopCoroutine(preparoCoroutine);
@@ -317,6 +352,9 @@ public class GameManager : MonoBehaviour
         blocoCorreto = blocks[indiceCorreto];
         blocoCorreto.SetColor(targetColor);
 
+        // Em vez de as cores "estourarem" de uma vez, elas acendem em onda a partir do centro.
+        IniciarOnda();
+
         Debug.Log(
             $"Rodada {rodada} iniciada | " +
             $"Tempo: {tempoAtual:F2}s | " +
@@ -345,6 +383,99 @@ public class GameManager : MonoBehaviour
         );
 
         return Mathf.Lerp(distanciaMinInicial, distanciaMinFinal, t);
+    }
+
+    // =========================================================
+    // ONDA DE REVELAÇÃO (só visual: não mexe em colisores nem em BlockColor)
+    // =========================================================
+
+    private void IniciarOnda()
+    {
+        PararOnda();
+
+        float duracao = Mathf.Min(duracaoOndaMax, tempoAtual * fracaoOndaDaRodada);
+
+        if (duracao <= 0.02f)
+            return;
+
+        ondaCoroutine = StartCoroutine(OndaRevelacao(duracao));
+    }
+
+    private void PararOnda()
+    {
+        if (ondaCoroutine != null)
+        {
+            StopCoroutine(ondaCoroutine);
+            ondaCoroutine = null;
+        }
+    }
+
+    private IEnumerator OndaRevelacao(float duracao)
+    {
+        int n = blocks.Count;
+        float[] atraso = new float[n];
+        float maisLonge = 0.0001f;
+
+        for (int i = 0; i < n; i++)
+        {
+            Vector3 d = blocks[i].transform.position - centroTabuleiro;
+            d.y = 0f;
+            atraso[i] = d.magnitude;
+            maisLonge = Mathf.Max(maisLonge, atraso[i]);
+        }
+
+        float fade = duracao * 0.45f;          // tempo que cada tile leva para acender
+        float espalhar = duracao - fade;       // tempo para a onda chegar até a borda
+
+        for (int i = 0; i < n; i++)
+        {
+            atraso[i] = atraso[i] / maisLonge * espalhar;
+            blocks[i].SetVisualColor(corPadraoBlocos);   // começa neutro, no mesmo frame da troca de cores
+        }
+
+        float t = 0f;
+
+        while (t < duracao)
+        {
+            t += Time.deltaTime;
+
+            for (int i = 0; i < n; i++)
+            {
+                float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((t - atraso[i]) / fade));
+
+                blocks[i].SetVisualColor(
+                    Color.Lerp(corPadraoBlocos, blocks[i].BlockColor, k)
+                );
+            }
+
+            yield return null;
+        }
+
+        for (int i = 0; i < n; i++)
+            blocks[i].SetVisualColor(blocks[i].BlockColor);
+
+        ondaCoroutine = null;
+    }
+
+    // =========================================================
+    // TIQUE NOS ÚLTIMOS SEGUNDOS (na batida da música, nada de susto)
+    // =========================================================
+
+    private void AoBater(int beat)
+    {
+        if (!tiqueTaque || !roundActive || AudioManager.Instance == null)
+            return;
+
+        float restante = TempoRestante;
+
+        // Só nos últimos segundos, nunca logo no começo da rodada nem no instante final.
+        if (restante > segundosDeTique || restante < 0.15f)
+            return;
+
+        if (tempoAtual - restante < 0.4f)
+            return;
+
+        AudioManager.Instance.PlayTick();
     }
 
     private IEnumerator TimerRodada()

@@ -408,6 +408,8 @@ MonoBehaviour:
   error: {fileID: 8300000, guid: 1693bd5e1a73c044b88274c02e80429f, type: 3}
   correct: {fileID: 8300000, guid: 2a00dde13c2f6994f90a816d2ac50f8f, type: 3}
   jingle: {fileID: 8300000, guid: a5e5fd5dd671bc2488bb9633a51db065, type: 3}
+  tick: {fileID: 0}
+  tickVolume: 0.45
   colorNotes:
   - {fileID: 8300000, guid: da2c773d725a6614e8ced3248b36eaf5, type: 3}
   - {fileID: 8300000, guid: ce7f216ef34507b4c95a937716774d70, type: 3}
@@ -2460,8 +2462,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -65, y: -515}
-  m_SizeDelta: {x: 200, y: 50}
+  m_AnchoredPosition: {x: 150, y: -500}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &907223039
 MonoBehaviour:
@@ -2483,7 +2485,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "v0.2.0 pr\xE9-alpha"
+  m_text: "v0.3.2 pr\xE9-alpha"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 7e7100c8671fab045a4684294a39706b, type: 2}
   m_sharedMaterial: {fileID: 8547012136375342751, guid: 7e7100c8671fab045a4684294a39706b, type: 2}
@@ -2549,7 +2551,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: -1165.9993, y: -1032.6333, z: -887.97864, w: 23.990242}
+  m_margin: {x: -1108.9624, y: -1038.697, z: -782.4894, w: -13.105507}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
