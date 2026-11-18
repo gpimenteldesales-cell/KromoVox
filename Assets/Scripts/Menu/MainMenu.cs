@@ -62,7 +62,6 @@ public class MainMenu : MonoBehaviour
 
     public void OpenOptions()
     {
-        if (mainPanel != null) mainPanel.SetActive(false);
         if (optionsPanel != null) optionsPanel.SetActive(true);
     }
 
