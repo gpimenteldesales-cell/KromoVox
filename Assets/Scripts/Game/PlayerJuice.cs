@@ -43,9 +43,12 @@ public class PlayerJuice : MonoBehaviour
     float vel01;        // 0 = parado, 1 = andando (suavizado)
     bool estavaMovendo;
     Vector2 ultimaDirecao = Vector2.up;
+    PlayerMove playerMove;
 
     void Awake()
     {
+        playerMove = GetComponent<PlayerMove>();
+
         if (visual == null)
             visual = CriarPivot();
 
@@ -60,8 +63,8 @@ public class PlayerJuice : MonoBehaviour
         float dt = Mathf.Min(Time.deltaTime, 0.033f);
         if (dt <= 0f) return;
 
-        // Mesma leitura de input do PlayerMove.
-        Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
+        // Mesma leitura de input do PlayerMove (teclado, controle e toque).
+        Vector2 input = playerMove != null ? playerMove.InputAtual : Vector2.zero;
         bool movendo = input.sqrMagnitude > 0.01f;
 
         if (movendo != estavaMovendo)

@@ -424,11 +424,12 @@ MonoBehaviour:
   tempoInicial: 10
   tempoMinimo: 3
   reducaoPorRodada: 0.567
+  velocidadeMusicaMax: 1.2
   tempoPreparo: 3
   tempoPreparoRetry: 1.5
   corFundo: {r: 0.1, g: 0.1, b: 0.12, a: 1}
   duracaoTransicaoFundo: 0.25
-  corPadraoBlocos: {r: 1, g: 1, b: 1, a: 1}
+  corNeutraBlocos: {r: 0.13, g: 0.09, b: 0.24, a: 1}
   corVitoria: {r: 0.24, g: 0.86, b: 0.52, a: 1}
   duracaoPulsoVitoria: 0.5
   forcaPulsoVitoria: 0.55
@@ -436,6 +437,11 @@ MonoBehaviour:
   corBlocosApagados: {r: 0.25, g: 0.25, b: 0.3, a: 1}
   duracaoRevelacao: 0.6
   atrasoGameOver: 0.9
+  pontosBase: 100
+  bonusMaximoVelocidade: 100
+  limiarCombo: 0.5
+  passoMultiplicador: 0.25
+  multiplicadorMaximo: 3
   duracaoOndaMax: 0.4
   fracaoOndaDaRodada: 0.15
   tiqueTaque: 1
@@ -2011,8 +2017,14 @@ MonoBehaviour:
   textoAlvo: TARGET
   textoRegra: STAND ON THE TILE THAT MATCHES THE TARGET!
   textoControles: 'MOVE: WASD / ARROWS'
+  textoControlesGamepad: 'MOVE: LEFT STICK / D-PAD'
+  textoControlesToque: 'MOVE: TOUCH PAD'
   textoDerrota: TIME'S UP!
   textoDerrotaExplicacao: THE TILE THAT KEPT ITS COLOR WAS THE ANSWER
+  textoPontos: SCORE
+  textoRecorde: BEST
+  textoNovoRecorde: NEW BEST!
+  textoCombo: COMBO
   rodadasComDica: 3
   margemDica: 30
   duracaoFadeIn: 0.8
@@ -2028,6 +2040,7 @@ MonoBehaviour:
   corPreparo: {r: 0.62, g: 0.42, b: 1, a: 1}
   corPerigo: {r: 0.95, g: 0.25, b: 0.25, a: 1}
   corTextoSuave: {r: 1, g: 1, b: 1, a: 0.7}
+  corDestaque: {r: 1, g: 0.82, b: 0.25, a: 1}
   corAlvoVazia: {r: 0.16, g: 0.13, b: 0.24, a: 1}
   corMolduraAlvo: {r: 0.96, g: 0.96, b: 1, a: 1}
 --- !u!1 &845658123
@@ -2701,6 +2714,34 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameOverUI
   painelGameOver: {fileID: 1427552878}
   nomeCenaMenu: MainMenu
+  textoTitulo: GAME OVER
+  textoPontos: SCORE
+  textoRecorde: BEST
+  textoNovoRecorde: NEW BEST!
+  textoTentar: TRY AGAIN
+  textoMenu: MENU
+  atraso: 0.6
+  duracaoFade: 0.35
+  fontePixel: {fileID: 11400000, guid: 7e7100c8671fab045a4684294a39706b, type: 2}
+  font: {fileID: 11400000, guid: 45a9d96e27149a2459637c969df74209, type: 2}
+  sortingOrder: 20
+  pixel: 5
+  tamanhoPainel: {x: 420, y: 580}
+  margemDireita: 40
+  contornoTexto: 0.22
+  pulsarNaBatida: 1
+  jingleNovoRecorde: 1
+  corBordaPainel: {r: 0.43, g: 0.25, b: 1, a: 1}
+  corFundoPainel: {r: 0.03, g: 0.02, b: 0.07, a: 1}
+  corBlocoTitulo: {r: 0.48, g: 0.27, b: 1, a: 1}
+  corImpacto: {r: 0.95, g: 0.25, b: 0.25, a: 1}
+  corContornoTexto: {r: 0, g: 0, b: 0, a: 1}
+  corTextoSuave: {r: 1, g: 1, b: 1, a: 0.75}
+  corDestaque: {r: 1, g: 0.82, b: 0.25, a: 1}
+  corBotaoBorda: {r: 0.43, g: 0.25, b: 1, a: 1}
+  corBotaoFundo: {r: 0.13, g: 0.08, b: 0.26, a: 1}
+  corBotaoBordaSel: {r: 0.24, g: 0.86, b: 0.52, a: 1}
+  corBotaoFundoSel: {r: 0.05, g: 0.22, b: 0.15, a: 1}
 --- !u!1 &1132744223
 GameObject:
   m_ObjectHideFlags: 0
@@ -4451,6 +4492,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
   velocidade: 40
   referenciaCamera: {fileID: 330585546}
+  usarTeclado: 1
+  usarControle: 1
+  usarToque: 1
+  entradaCrua: 1
+  suavizacao: 14
+  zonaMorta: 0.2
 --- !u!114 &1658480750
 MonoBehaviour:
   m_ObjectHideFlags: 0

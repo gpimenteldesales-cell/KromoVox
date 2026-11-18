@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -23,6 +24,10 @@ public class MainMenu : MonoBehaviour
     [Header("Opções")]
     [SerializeField] private Slider volumeSlider;
 
+    [Header("Navegação por controle e teclado")]
+    [Tooltip("Botão que já começa selecionado (ex.: JOGAR), para dar para navegar sem mouse.")]
+    [SerializeField] private Button primeiroBotao;
+
     [Header("Transição (painel preto em tela cheia com CanvasGroup)")]
     [SerializeField] private CanvasGroup fadeGroup;
     [SerializeField] private float fadeDuration = 0.4f;
@@ -38,12 +43,30 @@ public class MainMenu : MonoBehaviour
         if (quitButton != null) quitButton.SetActive(false);
 #endif
 
-        float volume = PlayerPrefs.GetFloat(VolumeKey, 0.8f);
-        AudioListener.volume = volume;
+        // Volume: com o AudioManager, ELE é o dono do volume (o VolumeSlider já faz a ligação).
+        // Antes, o menu também mexia no AudioListener.volume e o som era abafado duas vezes.
+        AudioManager am = AudioManager.Instance;
+        float volume;
+
+        if (am != null)
+        {
+            AudioListener.volume = 1f;
+            volume = am.MasterVolume;
+        }
+        else
+        {
+            volume = PlayerPrefs.GetFloat(VolumeKey, 0.8f);
+            AudioListener.volume = volume;
+        }
+
         if (volumeSlider != null)
         {
             volumeSlider.SetValueWithoutNotify(volume);
-            volumeSlider.onValueChanged.AddListener(SetVolume);
+
+            if (am == null)
+                volumeSlider.onValueChanged.AddListener(SetVolume);
+            else if (volumeSlider.GetComponent<VolumeSlider>() == null)
+                volumeSlider.onValueChanged.AddListener(am.SetMasterVolume);
         }
 
         CloseOptions();
@@ -56,20 +79,30 @@ public class MainMenu : MonoBehaviour
     }
 
     public void Play()
-    {   
-        if (!isLoading) StartCoroutine(LoadGame()); 
+    {
+        if (!isLoading) StartCoroutine(LoadGame());
     }
 
     public void OpenOptions()
     {
         if (mainPanel != null) mainPanel.SetActive(false);
         if (optionsPanel != null) optionsPanel.SetActive(true);
+
+        Selecionar(volumeSlider != null ? volumeSlider.gameObject : null);
     }
 
     public void CloseOptions()
     {
         if (optionsPanel != null) optionsPanel.SetActive(false);
         if (mainPanel != null) mainPanel.SetActive(true);
+
+        Selecionar(primeiroBotao != null ? primeiroBotao.gameObject : null);
+    }
+
+    private void Selecionar(GameObject alvo)
+    {
+        if (alvo != null && EventSystem.current != null)
+            EventSystem.current.SetSelectedGameObject(alvo);
     }
 
     public void Quit()

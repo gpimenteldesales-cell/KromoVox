@@ -45,6 +45,10 @@ public class GameManager : MonoBehaviour
     [Range(0.5f, 0.99f)]
     public float reducaoPorRodada = 0.95f;
 
+    [Tooltip("Velocidade da música na dificuldade máxima (1 = normal). O AudioManager limita em 1.25.")]
+    [Range(1f, 1.25f)]
+    public float velocidadeMusicaMax = 1.2f;
+
     [Header("Entrada calma (sem susto)")]
     [Tooltip("Preparo antes da primeira rodada, em segundos. O jogador já pode andar.")]
     public float tempoPreparo = 3f;
@@ -59,8 +63,8 @@ public class GameManager : MonoBehaviour
     public float duracaoTransicaoFundo = 0.25f;
 
     [Header("Feedback visual")]
-    [Tooltip("Cor dos blocos entre as rodadas. Dica: um cinza suave incomoda menos que branco puro.")]
-    public Color corPadraoBlocos = Color.white;
+    [Tooltip("Cor dos blocos entre as rodadas e no começo da onda. Um roxo escuro combina com o HUD e evita o clarão do branco puro.")]
+    public Color corNeutraBlocos = new Color(0.13f, 0.09f, 0.24f);
 
     public Color corVitoria = new Color(0.24f, 0.86f, 0.52f);
 
@@ -83,6 +87,23 @@ public class GameManager : MonoBehaviour
 
     [Tooltip("Espera antes de mostrar o painel de Game Over, para o jogador ver o bloco certo.")]
     public float atrasoGameOver = 0.9f;
+
+    [Header("Pontuação")]
+    [Tooltip("Pontos por rodada vencida.")]
+    public int pontosBase = 100;
+
+    [Tooltip("Bônus máximo por chegar cedo ao bloco certo e ficar nele (proporcional ao tempo que sobrava).")]
+    public int bonusMaximoVelocidade = 100;
+
+    [Tooltip("Chegar ao bloco certo com pelo menos esta fração do tempo sobrando mantém o combo (0 a 1).")]
+    [Range(0f, 1f)]
+    public float limiarCombo = 0.5f;
+
+    [Tooltip("Quanto cada rodada de combo soma ao multiplicador (0,25 = x1.25, x1.5, x1.75...).")]
+    public float passoMultiplicador = 0.25f;
+
+    [Tooltip("Multiplicador máximo de pontos.")]
+    public float multiplicadorMaximo = 3f;
 
     [Header("Vida no tabuleiro")]
     [Tooltip("Duração máxima da onda que acende os tiles no começo de cada rodada. 0 = desliga (as cores aparecem de uma vez).")]
@@ -130,6 +151,17 @@ public class GameManager : MonoBehaviour
     private int rodadaUid;
     private bool fimDeJogo;
 
+    // --- pontuação ---
+    private const string ChaveRecorde = "chromablitz_recorde";
+    private int pontuacao;
+    private int recordeSalvo;
+    private int combo;
+    private float multiplicador = 1f;
+    private int ultimoGanho;
+    private int ganhoUid;
+    private bool novoRecorde;
+    private float chegada01;   // fração do tempo que sobrava quando o player pisou no bloco certo (e ficou)
+
     private bool emPreparo;
     private float preparoFim;
     private float preparoTotal;
@@ -140,6 +172,15 @@ public class GameManager : MonoBehaviour
 
     /// <summary>Número da rodada atual (0 durante o preparo, depois 1, 2, 3...).</summary>
     public int Rodada => rodada;
+
+    // --- pontuação (lida pelo HUD) ---
+    public int Pontuacao => pontuacao;
+    public int Recorde => recordeSalvo;
+    public int Combo => combo;
+    public float Multiplicador => multiplicador;
+    public int UltimoGanho => ultimoGanho;
+    public int GanhoUid => ganhoUid;
+    public bool NovoRecorde => novoRecorde;
 
     /// <summary>Contador que sobe a cada rodada/preparo e nunca reseta (detecta "algo novo").</summary>
     public int RodadaUid => rodadaUid;
@@ -259,6 +300,8 @@ public class GameManager : MonoBehaviour
         }
 
         // Em vez de valer já no primeiro frame, o jogo começa com um preparo calmo.
+        recordeSalvo = PlayerPrefs.GetInt(ChaveRecorde, 0);
+
         // Tique na batida da música (o AudioManager vive entre cenas: desinscreve no OnDestroy).
         if (AudioManager.Instance != null)
             AudioManager.Instance.OnBeat += AoBater;
@@ -301,7 +344,7 @@ public class GameManager : MonoBehaviour
         // Tabuleiro neutro e fundo calmo: nenhuma cor aleatória até valer.
         foreach (GridBlock block in blocks)
         {
-            block.SetColor(corPadraoBlocos);
+            block.SetColor(corNeutraBlocos);
         }
 
         MudarFundo(corFundo, duracaoTransicaoFundo);
@@ -351,6 +394,9 @@ public class GameManager : MonoBehaviour
 
         blocoCorreto = blocks[indiceCorreto];
         blocoCorreto.SetColor(targetColor);
+
+        // Se o player já está em cima do bloco certo, conta como chegada no tempo máximo.
+        chegada01 = currentBlocks.Contains(blocoCorreto) ? 1f : 0f;
 
         // Em vez de as cores "estourarem" de uma vez, elas acendem em onda a partir do centro.
         IniciarOnda();
@@ -430,7 +476,7 @@ public class GameManager : MonoBehaviour
         for (int i = 0; i < n; i++)
         {
             atraso[i] = atraso[i] / maisLonge * espalhar;
-            blocks[i].SetVisualColor(corPadraoBlocos);   // começa neutro, no mesmo frame da troca de cores
+            blocks[i].SetVisualColor(corNeutraBlocos);   // começa neutro, no mesmo frame da troca de cores
         }
 
         float t = 0f;
@@ -444,7 +490,7 @@ public class GameManager : MonoBehaviour
                 float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((t - atraso[i]) / fade));
 
                 blocks[i].SetVisualColor(
-                    Color.Lerp(corPadraoBlocos, blocks[i].BlockColor, k)
+                    Color.Lerp(corNeutraBlocos, blocks[i].BlockColor, k)
                 );
             }
 
@@ -476,6 +522,21 @@ public class GameManager : MonoBehaviour
             return;
 
         AudioManager.Instance.PlayTick();
+    }
+
+    /// <summary>
+    /// A música acelera junto com a dificuldade (o tempo da rodada encurtando),
+    /// com o efeito de "fita acelerando" do AudioManager.
+    /// </summary>
+    private void AtualizarVelocidadeMusica()
+    {
+        AudioManager am = AudioManager.Instance;
+        if (am == null) return;
+
+        float faixa = Mathf.Max(0.01f, tempoInicial - tempoMinimo);
+        float dificuldade01 = Mathf.Clamp01((tempoInicial - tempoAtual) / faixa);
+
+        am.SetMusicSpeed(1f + (velocidadeMusicaMax - 1f) * dificuldade01, 1.5f);
     }
 
     private IEnumerator TimerRodada()
@@ -657,6 +718,10 @@ public class GameManager : MonoBehaviour
             currentBlocks.Add(block);
         }
 
+        // Pisou no bloco certo durante a rodada: guarda quanto tempo ainda sobrava (bônus de velocidade).
+        if (roundActive && block == blocoCorreto)
+            chegada01 = Mathf.Clamp01(TempoRestante / Mathf.Max(0.01f, tempoAtual));
+
         Debug.Log(
             $"Entrou em {block.name} | " +
             $"Cor: {block.BlockColor}"
@@ -677,15 +742,55 @@ public class GameManager : MonoBehaviour
             return;
 
         currentBlocks.Remove(block);
+
+        // Saiu do bloco certo: perde o bônus de chegada (vale a última vez que ele pisou e ficou).
+        if (block == blocoCorreto)
+            chegada01 = 0f;
     }
 
     // =========================================================
     // VITÓRIA
     // =========================================================
 
+    /// <summary>
+    /// Pontos da rodada = (base + bônus de velocidade) x multiplicador de combo.
+    /// Combo sobe quando o player chega cedo ao bloco certo; chegar tarde zera o combo
+    /// (mas nunca encerra o jogo).
+    /// </summary>
+    private void RegistrarPontos()
+    {
+        float rapidez = Mathf.Clamp01(chegada01);
+        int bonus = Mathf.RoundToInt(bonusMaximoVelocidade * rapidez);
+
+        if (rapidez >= limiarCombo) combo++;
+        else combo = 0;
+
+        multiplicador = Mathf.Min(1f + combo * passoMultiplicador, multiplicadorMaximo);
+
+        ultimoGanho = Mathf.RoundToInt((pontosBase + bonus) * multiplicador);
+        pontuacao += ultimoGanho;
+        ganhoUid++;
+
+        if (pontuacao > recordeSalvo)
+        {
+            // "Novo recorde" só aparece se já existia um recorde para bater.
+            if (recordeSalvo > 0) novoRecorde = true;
+
+            recordeSalvo = pontuacao;
+            PlayerPrefs.SetInt(ChaveRecorde, recordeSalvo);
+        }
+
+        Debug.Log(
+            $"Pontos: +{ultimoGanho} (base {pontosBase} + velocidade {bonus}) x{multiplicador:0.##} | " +
+            $"Total: {pontuacao} | Recorde: {recordeSalvo}"
+        );
+    }
+
     private IEnumerator VitoriaRoutine()
     {
         roundActive = false;
+
+        RegistrarPontos();
 
         // Um único pulso suave (sobe e desce), em vez de piscadas secas.
         yield return StartCoroutine(
@@ -694,7 +799,7 @@ public class GameManager : MonoBehaviour
 
         foreach (GridBlock block in blocks)
         {
-            block.SetColor(corPadraoBlocos);
+            block.SetColor(corNeutraBlocos);
         }
 
         onRoundWon?.Invoke();
@@ -704,6 +809,8 @@ public class GameManager : MonoBehaviour
             tempoMinimo,
             tempoAtual * reducaoPorRodada
         );
+
+        AtualizarVelocidadeMusica();
 
         yield return new WaitForSeconds(pausaAposVitoria);
 
@@ -751,6 +858,16 @@ public class GameManager : MonoBehaviour
     {
         roundActive = false;
         fimDeJogo = true;
+
+        // Grava o recorde no fim da partida (no WebGL vai para o armazenamento do navegador).
+        PlayerPrefs.Save();
+
+        // A música abafa (estado GameOver) e volta à velocidade normal.
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.SetState(AudioManager.MusicState.GameOver, 1f);
+            AudioManager.Instance.SetMusicSpeed(1f, 1.5f);
+        }
 
         onRoundLost?.Invoke();
 
@@ -818,6 +935,19 @@ public class GameManager : MonoBehaviour
         rodada = 0;
         roundActive = false;
         blocoCorreto = null;
+
+        pontuacao = 0;
+        combo = 0;
+        multiplicador = 1f;
+        ultimoGanho = 0;
+        novoRecorde = false;
+        chegada01 = 0f;
+
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.SetState(AudioManager.MusicState.Gameplay, 0.8f);
+            AudioManager.Instance.SetMusicSpeed(1f, 0.8f);
+        }
 
         IniciarPreparo(tempoPreparoRetry);
     }

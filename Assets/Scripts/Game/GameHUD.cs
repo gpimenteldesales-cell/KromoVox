@@ -27,9 +27,18 @@ public class GameHUD : MonoBehaviour
     public string textoPreparo = "GET READY";
     public string textoAlvo = "TARGET";
     public string textoRegra = "STAND ON THE TILE THAT MATCHES THE TARGET!";
+    [Tooltip("Texto dos controles no teclado.")]
     public string textoControles = "MOVE: WASD / ARROWS";
+    [Tooltip("Texto dos controles com controle (gamepad).")]
+    public string textoControlesGamepad = "MOVE: LEFT STICK / D-PAD";
+    [Tooltip("Texto dos controles no toque (celular).")]
+    public string textoControlesToque = "MOVE: TOUCH PAD";
     public string textoDerrota = "TIME'S UP!";
     public string textoDerrotaExplicacao = "THE TILE THAT KEPT ITS COLOR WAS THE ANSWER";
+    public string textoPontos = "SCORE";
+    public string textoRecorde = "BEST";
+    public string textoNovoRecorde = "NEW BEST!";
+    public string textoCombo = "COMBO";
 
     [Header("Dica de início")]
     [Tooltip("A dica fica visível durante o preparo e nas primeiras N rodadas.")]
@@ -60,6 +69,7 @@ public class GameHUD : MonoBehaviour
     public Color corPreparo = new Color(0.62f, 0.42f, 1.00f);           // barra do "get ready"
     public Color corPerigo = new Color(0.95f, 0.25f, 0.25f);            // vermelho do cubo/derrota
     public Color corTextoSuave = new Color(1f, 1f, 1f, 0.75f);
+    public Color corDestaque = new Color(1.00f, 0.82f, 0.25f);          // dourado: combo, "+pontos", novo recorde
 
     [Header("Painel da cor-alvo")]
     [Tooltip("Cor do quadro enquanto ainda não existe cor-alvo (preparo).")]
@@ -74,6 +84,11 @@ public class GameHUD : MonoBehaviour
     TextMeshProUGUI txtInterrogacao;
     TextMeshProUGUI txtDica;
     TextMeshProUGUI txtControles;
+    TextMeshProUGUI txtPontos;
+    TextMeshProUGUI txtRecorde;
+    TextMeshProUGUI txtCombo;
+    TextMeshProUGUI txtGanho;
+    CanvasGroup grupoCombo;
     RectTransform barraFill;
     Image barraFillImg;
     Image quadroAlvo;
@@ -83,12 +98,19 @@ public class GameHUD : MonoBehaviour
     CanvasGroup grupoDica;
     Image fadePreto;
 
+    enum Dispositivo { Teclado, Gamepad, Toque }
+    Dispositivo dispositivo = Dispositivo.Teclado;
+
     int ultimoUid = -1;
     float alphaDica;
     float tFadeIn;
     Color corAlvoAtual;
     Coroutine popRodadaCo;
     Coroutine popAlvoCo;
+    Coroutine popPontosCo;
+    Coroutine ganhoCo;
+    float pontExibida;
+    int ultimoGanhoUid = -1;
 
     static readonly Dictionary<int, Sprite> cacheSprites = new Dictionary<int, Sprite>();
 
@@ -96,10 +118,14 @@ public class GameHUD : MonoBehaviour
     {
         BuildUI();
         corAlvoAtual = corAlvoVazia;
+
+        if (Application.isMobilePlatform)
+            dispositivo = Dispositivo.Toque;
     }
 
     void Update()
     {
+        AtualizarDispositivo();
         AtualizarFadeIn();
 
         var gm = GameManager.Instance;
@@ -124,11 +150,50 @@ public class GameHUD : MonoBehaviour
         AtualizarPainelTempo(gm);
         AtualizarPainelAlvo(gm);
         AtualizarMensagem(gm);
+        AtualizarPontuacao(gm);
     }
 
     // ------------------------------------------------------------------
     // ATUALIZAÇÕES
     // ------------------------------------------------------------------
+    /// <summary>
+    /// Descobre qual foi o último dispositivo usado (teclado, controle ou toque),
+    /// para a dica de controles mostrar o texto certo.
+    /// </summary>
+    void AtualizarDispositivo()
+    {
+#if ENABLE_INPUT_SYSTEM
+        var toque = UnityEngine.InputSystem.Touchscreen.current;
+        var pad = UnityEngine.InputSystem.Gamepad.current;
+        var teclado = UnityEngine.InputSystem.Keyboard.current;
+
+        if (toque != null && toque.primaryTouch.press.isPressed)
+            dispositivo = Dispositivo.Toque;
+        else if (pad != null && (pad.leftStick.ReadValue().sqrMagnitude > 0.09f
+                                 || pad.dpad.ReadValue().sqrMagnitude > 0.01f
+                                 || pad.buttonSouth.isPressed
+                                 || pad.startButton.isPressed))
+            dispositivo = Dispositivo.Gamepad;
+        else if (teclado != null && teclado.anyKey.isPressed)
+            dispositivo = Dispositivo.Teclado;
+#else
+        if (Input.touchCount > 0)
+            dispositivo = Dispositivo.Toque;
+        else if (Input.anyKey)
+            dispositivo = Dispositivo.Teclado;
+#endif
+    }
+
+    string TextoControlesAtual()
+    {
+        switch (dispositivo)
+        {
+            case Dispositivo.Gamepad: return textoControlesGamepad;
+            case Dispositivo.Toque: return textoControlesToque;
+            default: return textoControles;
+        }
+    }
+
     void AtualizarFadeIn()
     {
         if (tFadeIn >= duracaoFadeIn) return;
@@ -202,7 +267,7 @@ public class GameHUD : MonoBehaviour
         bool mostrar = dicaInicio || derrota;
 
         string t1 = derrota ? textoDerrota : textoRegra;
-        string t2 = derrota ? textoDerrotaExplicacao : textoControles;
+        string t2 = derrota ? textoDerrotaExplicacao : TextoControlesAtual();
         Color c2 = derrota ? Color.white : corVerde;
 
         bool textoIgual = txtDica.text == t1;
@@ -218,7 +283,83 @@ public class GameHUD : MonoBehaviour
             txtControles.color = c2;
         }
 
+        // Troca de dispositivo com a dica visível: atualiza só a linha de controles.
+        if (mostrar && !derrota && textoIgual)
+            SetText(txtControles, t2);
+
         grupoDica.alpha = alphaDica;
+    }
+
+    void AtualizarPontuacao(GameManager gm)
+    {
+        float dt = Time.unscaledDeltaTime;
+
+        // O número sobe aos poucos (contagem). Se zerou (reinício), vai direto.
+        float alvo = gm.Pontuacao;
+        if (alvo < pontExibida) pontExibida = alvo;
+        else pontExibida = Mathf.Lerp(pontExibida, alvo, 1f - Mathf.Exp(-10f * dt));
+        if (alvo - pontExibida < 0.5f) pontExibida = alvo;
+
+        SetText(txtPontos, Mathf.RoundToInt(pontExibida).ToString(CultureInfo.InvariantCulture));
+
+        // Recorde: vira "NEW BEST!" dourado quando o player passa o recorde antigo.
+        if (gm.NovoRecorde)
+        {
+            SetText(txtRecorde, textoNovoRecorde);
+            txtRecorde.color = corDestaque;
+        }
+        else
+        {
+            SetText(txtRecorde, textoRecorde + " " + gm.Recorde.ToString(CultureInfo.InvariantCulture));
+            txtRecorde.color = corTextoSuave;
+        }
+
+        // Combo: aparece abaixo da pontuação enquanto houver multiplicador.
+        bool comboAtivo = gm.Combo >= 1 && !gm.FimDeJogo;
+        grupoCombo.alpha = Mathf.MoveTowards(grupoCombo.alpha, comboAtivo ? 1f : 0f, dt * 4f);
+        if (comboAtivo)
+            SetText(txtCombo, textoCombo + " x" + gm.Multiplicador.ToString("0.##", CultureInfo.InvariantCulture));
+
+        // Rodada vencida: número dá um "pop" e o "+pontos" sobe e some.
+        if (ultimoGanhoUid < 0)
+        {
+            ultimoGanhoUid = gm.GanhoUid;   // primeira leitura: só sincroniza, sem animar
+        }
+        else if (gm.GanhoUid != ultimoGanhoUid)
+        {
+            ultimoGanhoUid = gm.GanhoUid;
+
+            if (popPontosCo != null) StopCoroutine(popPontosCo);
+            popPontosCo = StartCoroutine(Pop(txtPontos.rectTransform, 0.15f));
+
+            if (ganhoCo != null) StopCoroutine(ganhoCo);
+            ganhoCo = StartCoroutine(MostrarGanho(gm.UltimoGanho));
+        }
+    }
+
+    IEnumerator MostrarGanho(int pontos)
+    {
+        SetText(txtGanho, "+" + pontos.ToString(CultureInfo.InvariantCulture));
+
+        RectTransform rt = txtGanho.rectTransform;
+        Vector2 baseP = new Vector2(-400f, -92f);
+
+        const float duracao = 0.9f;
+        float t = 0f;
+
+        while (t < duracao)
+        {
+            t += Time.unscaledDeltaTime;
+            float k = Mathf.Clamp01(t / duracao);
+            float sobe = 1f - (1f - k) * (1f - k);          // sobe rápido e desacelera
+
+            rt.anchoredPosition = baseP + Vector2.up * (36f * sobe);
+            txtGanho.alpha = k < 0.6f ? 1f : 1f - (k - 0.6f) / 0.4f;
+            yield return null;
+        }
+
+        txtGanho.alpha = 0f;
+        rt.anchoredPosition = baseP;
     }
 
     static void SetText(TMP_Text t, string s)
@@ -286,6 +427,51 @@ public class GameHUD : MonoBehaviour
             Vector2.zero, new Vector2(1f, 0.66f),
             new Vector2(24f, 6f), new Vector2(-16f, 0f),
             new Vector2(0f, 0.5f));   // pivô à esquerda: o "pop" cresce para a direita
+
+        // ---------- PONTUAÇÃO (topo direito): total, recorde e combo
+        MakePanel(root, "PainelPontos",
+            new Vector2(1f, 1f), new Vector2(1f, 1f),
+            new Vector2(-40f, -40f), new Vector2(340f, 104f), 28,
+            out conteudo);
+
+        var lblPontos = MakeText(conteudo, "Label", textoPontos, 24f, corTextoSuave, TextAlignmentOptions.MidlineLeft);
+        Place(lblPontos.rectTransform,
+            new Vector2(0f, 0.62f), new Vector2(0.4f, 1f),
+            new Vector2(24f, 0f), new Vector2(0f, -6f));
+
+        txtRecorde = MakeText(conteudo, "Recorde", textoRecorde + " 0", 24f, corTextoSuave, TextAlignmentOptions.MidlineRight);
+        Place(txtRecorde.rectTransform,
+            new Vector2(0.35f, 0.62f), Vector2.one,
+            new Vector2(0f, 0f), new Vector2(-24f, -6f));
+
+        txtPontos = MakeText(conteudo, "Valor", "0", 56f, Color.white, TextAlignmentOptions.MidlineLeft);
+        Place(txtPontos.rectTransform,
+            Vector2.zero, new Vector2(1f, 0.66f),
+            new Vector2(24f, 6f), new Vector2(-16f, 0f),
+            new Vector2(0f, 0.5f));   // pivô à esquerda: o "pop" cresce para a direita
+
+        RectTransform raizCombo = MakePanel(root, "PainelCombo",
+            new Vector2(1f, 1f), new Vector2(1f, 1f),
+            new Vector2(-40f, -158f), new Vector2(260f, 60f), 22,
+            out conteudo);
+
+        grupoCombo = raizCombo.gameObject.AddComponent<CanvasGroup>();
+        grupoCombo.alpha = 0f;
+        grupoCombo.interactable = false;
+        grupoCombo.blocksRaycasts = false;
+
+        txtCombo = MakeText(conteudo, "Combo", textoCombo + " x1", 30f, corDestaque, TextAlignmentOptions.Center);
+        Inset(txtCombo.rectTransform, 0f);
+
+        // "+pontos" que sobe ao lado do painel de pontuação quando o player acerta.
+        txtGanho = MakeText(root, "Ganho", "+0", 52f, corDestaque, TextAlignmentOptions.MidlineRight);
+        RectTransform ganhoRt = txtGanho.rectTransform;
+        ganhoRt.anchorMin = new Vector2(1f, 1f);
+        ganhoRt.anchorMax = new Vector2(1f, 1f);
+        ganhoRt.pivot = new Vector2(1f, 0.5f);
+        ganhoRt.sizeDelta = new Vector2(260f, 70f);
+        ganhoRt.anchoredPosition = new Vector2(-400f, -92f);
+        txtGanho.alpha = 0f;
 
         // ---------- ALVO + TEMPO (topo centro): o protagonista
         MakePanel(root, "PainelAlvo",
@@ -454,7 +640,7 @@ public class GameHUD : MonoBehaviour
     /// Retângulo arredondado branco (para tingir com Image.color), em 9-slice,
     /// gerado por código. Fica em cache por raio.
     /// </summary>
-    static Sprite RoundedSprite(int raio)
+    public static Sprite RoundedSprite(int raio)
     {
         if (cacheSprites.TryGetValue(raio, out Sprite existente) && existente != null)
             return existente;
