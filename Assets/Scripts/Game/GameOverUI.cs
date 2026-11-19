@@ -55,9 +55,10 @@ public class GameOverUI : MonoBehaviour
     public int sortingOrder = 20;
     [Tooltip("Tamanho de 1 'pixel' do visual, em px (base 1920x1080). Bordas e cantos sao multiplos disso.")]
     public float pixel = 5f;
-    public Vector2 tamanhoPainel = new Vector2(420f, 580f);
-    [Tooltip("Distancia do painel ate a borda direita da tela.")]
-    public float margemDireita = 40f;
+    public float larguraPainel = 400f;
+    public float alturaPainel = 660f;
+    [Tooltip("Distancia do painel ate a borda direita da tela (deixe folga para a ponta do tabuleiro).")]
+    public float margemLateral = 30f;
     [Range(0f, 0.5f)] public float contornoTexto = 0.22f;
     [Tooltip("O titulo e a faixa de cores batem no ritmo da musica.")]
     public bool pulsarNaBatida = true;
@@ -136,7 +137,11 @@ public class GameOverUI : MonoBehaviour
         if (painelGameOver != null)
             painelGameOver.SetActive(false);   // o painel antigo nunca aparece
 
-        if (rotina != null) StopCoroutine(rotina);
+        // Idempotente: se o painel ja esta entrando (ou ja esta na tela), ignora chamadas repetidas.
+        // Assim, mesmo com dois eventos ligados aqui no Inspector, a animacao nao reinicia nem pisca.
+        if (rotina != null || (grupo != null && grupo.alpha > 0.01f))
+            return;
+
         rotina = StartCoroutine(Aparecer());
     }
 
@@ -213,10 +218,7 @@ public class GameOverUI : MonoBehaviour
 
         // Seta pixel: aparece e balanca de leve quando selecionado.
         b.seta.localScale = new Vector3(b.sel, b.sel, 1f);
-        b.seta.anchoredPosition = new Vector2(pixel * 6f + Mathf.Sin(Time.unscaledTime * 9f) * pixel * 0.6f * b.sel, 0f);
-
-        float s = 1f + 0.04f * b.sel;
-        b.raiz.localScale = new Vector3(s, s, 1f);
+        b.seta.anchoredPosition = new Vector2(pixel * 3.6f + Mathf.Sin(Time.unscaledTime * 9f) * pixel * 0.6f * b.sel, 0f);
     }
 
     // ------------------------------------------------------------------
@@ -378,20 +380,22 @@ public class GameOverUI : MonoBehaviour
             pixel * 2f, pixel, bordaPainel, null, out miolo);
         PosicionarPainel(painel);
 
+        // Layout em pixels, de cima para baixo (com respiro entre os blocos).
         // Titulo: bloco roxo com texto branco pixel (como no menu).
         blocoTitulo = NovoRect("BlocoTitulo", miolo);
-        Place(blocoTitulo, new Vector2(0.10f, 0.78f), new Vector2(0.90f, 0.97f), Vector2.zero, Vector2.zero);
+        PlaceTop(blocoTitulo, 24f, 130f, 24f);
         Banda3(blocoTitulo, "T", corBlocoTitulo, pixel, null);
 
-        txtTitulo = MakeText(blocoTitulo, "Titulo", textoTitulo.Replace(' ', '\n'), 60f, Color.white, TextAlignmentOptions.Center);
-        Inset(txtTitulo.rectTransform, pixel);
+        txtTitulo = MakeText(blocoTitulo, "Titulo", textoTitulo.Replace(' ', '\n'), 54f, Color.white, TextAlignmentOptions.Center);
+        Inset(txtTitulo.rectTransform, pixel * 3f);
         baseTitulo = blocoTitulo.anchoredPosition;
 
         // Faixa das 6 cores das notas (pisca no ritmo).
         RectTransform faixaRt = NovoRect("Faixa", miolo);
-        faixaRt.anchorMin = faixaRt.anchorMax = new Vector2(0.5f, 0.745f);
-        float lado = pixel * 3f;
-        float passo = lado + pixel * 1.5f;
+        faixaRt.anchorMin = faixaRt.anchorMax = new Vector2(0.5f, 1f);
+        faixaRt.anchoredPosition = new Vector2(0f, -190f);
+        float lado = pixel * 4f;
+        float passo = lado + pixel * 2f;
         for (int i = 0; i < faixa.Length; i++)
         {
             Image q = NovaImagem(faixaRt, "Cor" + i, CoresFaixa[i]);
@@ -400,17 +404,17 @@ public class GameOverUI : MonoBehaviour
             faixa[i] = q;
         }
 
-        var lblPontos = MakeText(miolo, "LabelPontos", textoPontos, 30f, corTextoSuave, TextAlignmentOptions.Center);
-        Place(lblPontos.rectTransform, new Vector2(0f, 0.64f), new Vector2(1f, 0.715f), new Vector2(16f, 0f), new Vector2(-16f, 0f));
+        var lblPontos = MakeText(miolo, "LabelPontos", textoPontos, 32f, corTextoSuave, TextAlignmentOptions.Center);
+        PlaceTop(lblPontos.rectTransform, 214f, 36f, 16f);
 
-        txtPontos = MakeText(miolo, "Pontos", "0", 100f, Color.white, TextAlignmentOptions.Center);
-        Place(txtPontos.rectTransform, new Vector2(0f, 0.45f), new Vector2(1f, 0.65f), new Vector2(16f, 0f), new Vector2(-16f, 0f));
+        txtPontos = MakeText(miolo, "Pontos", "0", 96f, Color.white, TextAlignmentOptions.Center);
+        PlaceTop(txtPontos.rectTransform, 250f, 112f, 16f);
 
         txtRecorde = MakeText(miolo, "Recorde", textoRecorde + " 0", 34f, corTextoSuave, TextAlignmentOptions.Center);
-        Place(txtRecorde.rectTransform, new Vector2(0f, 0.36f), new Vector2(1f, 0.45f), new Vector2(16f, 0f), new Vector2(-16f, 0f));
+        PlaceTop(txtRecorde.rectTransform, 368f, 46f, 16f);
 
-        btnTentar = CriarBotao(miolo, "BotaoTentar", textoTentar, 0.20f, 0.345f, TryAgain);
-        btnMenu = CriarBotao(miolo, "BotaoMenu", textoMenu, 0.04f, 0.185f, IrParaMenu);
+        btnTentar = CriarBotao(miolo, "BotaoTentar", textoTentar, 442f, 78f, TryAgain);
+        btnMenu = CriarBotao(miolo, "BotaoMenu", textoMenu, 536f, 78f, IrParaMenu);
     }
 
     void PosicionarPainel(RectTransform rt)
@@ -418,17 +422,17 @@ public class GameOverUI : MonoBehaviour
         rt.anchorMin = new Vector2(1f, 0.5f);
         rt.anchorMax = new Vector2(1f, 0.5f);
         rt.pivot = new Vector2(1f, 0.5f);
-        rt.anchoredPosition = new Vector2(-margemDireita, -10f);
-        rt.sizeDelta = tamanhoPainel;
+        rt.anchoredPosition = new Vector2(-margemLateral, -10f);
+        rt.sizeDelta = new Vector2(larguraPainel, alturaPainel);
     }
 
-    BotaoPixel CriarBotao(RectTransform pai, string nome, string texto, float yMin, float yMax, UnityAction aoClicar)
+    BotaoPixel CriarBotao(RectTransform pai, string nome, string texto, float top, float altura, UnityAction aoClicar)
     {
         var b = new BotaoPixel();
 
         RectTransform miolo;
         b.raiz = CaixaPixel(pai, nome, corBotaoBorda, corBotaoFundo, pixel, pixel, b.borda, b.fundo, out miolo);
-        Place(b.raiz, new Vector2(0f, yMin), new Vector2(1f, yMax), new Vector2(pixel * 6f, 0f), new Vector2(-pixel * 6f, 0f));
+        PlaceTop(b.raiz, top, altura, pixel * 3f);
 
         // Toda a caixa recebe toque/mouse.
         foreach (Image img in b.borda) img.raycastTarget = true;
@@ -448,8 +452,12 @@ public class GameOverUI : MonoBehaviour
         et.triggers.Add(entrada);
 
         // Texto.
-        TextMeshProUGUI t = MakeText(miolo, "Texto", texto, 40f, Color.white, TextAlignmentOptions.Center);
-        Inset(t.rectTransform, pixel);
+        // Texto centralizado, com folga dos dois lados (a seta fica na folga da esquerda, sem cobrir letras).
+        TextMeshProUGUI t = MakeText(miolo, "Texto", texto, 32f, Color.white, TextAlignmentOptions.Center);
+        t.rectTransform.anchorMin = Vector2.zero;
+        t.rectTransform.anchorMax = Vector2.one;
+        t.rectTransform.offsetMin = new Vector2(pixel * 9f, pixel * 1.5f);
+        t.rectTransform.offsetMax = new Vector2(-pixel * 9f, -pixel * 1.5f);
 
         // Seta pixel (triangulo de 7 linhas) a esquerda do texto.
         b.seta = CriarSeta(miolo);
@@ -468,7 +476,7 @@ public class GameOverUI : MonoBehaviour
         seta.anchorMin = seta.anchorMax = new Vector2(0f, 0.5f);
         seta.pivot = new Vector2(0f, 0.5f);
         seta.sizeDelta = new Vector2(4f * u, 7f * u);
-        seta.anchoredPosition = new Vector2(pixel * 6f, 0f);
+        seta.anchoredPosition = new Vector2(pixel * 3.6f, 0f);
 
         for (int i = 0; i < larguras.Length; i++)
         {
@@ -588,6 +596,16 @@ public class GameOverUI : MonoBehaviour
         rt.pivot = new Vector2(0.5f, 0.5f);
         rt.offsetMin = offsetMin;
         rt.offsetMax = offsetMax;
+    }
+
+    /// <summary>Posiciona de cima para baixo: "top" px de distancia do topo, "altura" px de altura, margens laterais iguais.</summary>
+    static void PlaceTop(RectTransform rt, float top, float altura, float margemX)
+    {
+        rt.anchorMin = new Vector2(0f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.offsetMin = new Vector2(margemX, -(top + altura));
+        rt.offsetMax = new Vector2(-margemX, -top);
     }
 
     static void Inset(RectTransform rt, float px)

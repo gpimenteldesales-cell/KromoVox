@@ -3,10 +3,11 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
-/// Coloque em cada botão do menu. Toca hover (mouse e navegação por teclado/controle) e clique
-/// (ou "voltar"). Opcionalmente já muda o estado da música ao clicar.
+/// Coloque em cada botao do menu. Toca hover (mouse e navegacao por teclado/controle) e clique
+/// (ou "voltar"). Opcionalmente ja muda o estado da musica ao clicar.
 /// </summary>
 [RequireComponent(typeof(Button))]
+[DisallowMultipleComponent]
 public class ButtonSfx : MonoBehaviour, IPointerEnterHandler, ISelectHandler
 {
     public enum ClickKind { Click, Back, None }
@@ -24,12 +25,16 @@ public class ButtonSfx : MonoBehaviour, IPointerEnterHandler, ISelectHandler
     void Awake()
     {
         _button = GetComponent<Button>();
+    }
+
+    void OnEnable()
+    {
         _button.onClick.AddListener(OnClick);
     }
 
-    void OnDestroy()
+    void OnDisable()
     {
-        if (_button != null) _button.onClick.RemoveListener(OnClick);
+        _button.onClick.RemoveListener(OnClick);
     }
 
     public void OnPointerEnter(PointerEventData eventData) => Hover();
@@ -37,11 +42,15 @@ public class ButtonSfx : MonoBehaviour, IPointerEnterHandler, ISelectHandler
 
     void Hover()
     {
-        if (AudioManager.Instance == null || !_button.interactable) return;
-        // evita hover duplo (mouse + seleção no mesmo instante)
-        if (Time.unscaledTime - _lastHoverTime < 0.06f) return;
-        _lastHoverTime = Time.unscaledTime;
-        AudioManager.Instance.PlayHover();
+        var am = AudioManager.Instance;
+        if (am == null || !_button.interactable) return;
+
+        // evita hover duplo (mouse + selecao no mesmo instante)
+        float agora = Time.unscaledTime;
+        if (agora - _lastHoverTime < 0.06f) return;
+
+        _lastHoverTime = agora;
+        am.PlayHover();
     }
 
     void OnClick()
@@ -54,6 +63,7 @@ public class ButtonSfx : MonoBehaviour, IPointerEnterHandler, ISelectHandler
             case ClickKind.Click: am.PlayClick(); break;
             case ClickKind.Back: am.PlayBack(); break;
         }
+
         if (changeMusicState) am.SetState(musicState, fade);
     }
 }

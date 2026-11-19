@@ -2,14 +2,21 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// CHROMA BLITZ - gerenciador de áudio único (música em stems + SFX + relógio de batidas).
+/// KROMOVOX - gerenciador de audio unico (musica em stems + SFX + relogio de batidas).
 ///
 /// - Persiste entre cenas (DontDestroyOnLoad). Coloque UMA vez na primeira cena (MainMenu).
-/// - Música: 7 stems tocados em sincronia por amostra (PlayScheduled), com estados e fades.
-/// - SFX: pool de AudioSources, com variação leve de pitch/volume a cada disparo.
-/// - Ritmo: eventos OnBeat / OnBar calculados a partir da posição REAL da música
-///   (continuam corretos mesmo se a velocidade/pitch da música mudar).
-/// - Volumes (master/música/sfx) salvos em PlayerPrefs.
+/// - Musica: 7 stems tocados em sincronia por amostra (PlayScheduled), com estados e fades.
+/// - SFX: pool de AudioSources, com variacao leve de pitch/volume a cada disparo.
+/// - Ritmo: eventos OnBeat / OnBar calculados a partir da posicao REAL da musica
+///   (continuam corretos mesmo se a velocidade/pitch da musica mudar).
+/// - Volumes (master/musica/sfx) salvos em PlayerPrefs (com debounce: nao grava a cada frame do slider).
+///
+/// OTIMIZACOES desta versao:
+///  - Tudo que e caro (dspTime, timeSamples) e lido UMA vez por frame e reaproveitado por todos os scripts.
+///  - Clock: relogio de ritmo que SEMPRE anda. Se o audio travar (WebGL antes do primeiro clique),
+///    ele continua batendo sozinho e volta a seguir a musica quando ela destravar.
+///  - Filtro "abafado" so fica ligado quando esta de fato abafando (7 filtros ligados o tempo todo custam CPU).
+///  - Presets sem alocacao, SFX sem consultar isPlaying, volumes/pitch so escritos quando mudam.
 /// </summary>
 [DefaultExecutionOrder(-200)]
 public class AudioManager : MonoBehaviour
@@ -67,6 +74,9 @@ public class AudioManager : MonoBehaviour
 
     [Header("Filtro 'abafado' (Opções / Pause / Game Over)")]
     public float openCutoff = 22000f;
+    [Tooltip("No WebGL os filtros de áudio costumam não funcionar e ainda gastam CPU. " +
+             "Deixe DESLIGADO; o abafado fica só pela mixagem dos stems.")]
+    public bool filtroNoWebGL = false;
 
     // ---------------------------------------------------------------- Eventos de ritmo
     /// <summary>Disparado a cada batida. Parâmetro = batida dentro do loop (0..LoopBeats-1).</summary>
@@ -80,6 +90,7 @@ public class AudioManager : MonoBehaviour
         public AudioSource src;
         public AudioLowPassFilter lp;
         public float cur, target, speed;
+        public float lastVol = -1f;
     }
 
     const string KeyMaster = "audio_master";
@@ -89,41 +100,68 @@ public class AudioManager : MonoBehaviour
     readonly Layer[] _layers = new Layer[StemCount];
     Layer _ref;                       // stem usado como relógio
     AudioSource[] _pool;
-    float[] _poolTime;
+    float[] _poolTime;                // quando cada voz começou (para roubar a mais antiga)
+    float[] _poolEnd;                 // quando cada voz termina (evita consultar isPlaying)
 
     float _duck = 1f, _duckTarget = 1f;
     float _cutoff, _cutoffTarget, _cutoffSpeed;
     float _speed = 1f, _speedTarget = 1f, _speedRate = 1f;
+
+    // aplicados nos AudioSources (só escrevemos quando muda)
+    float _pitchAplicado = -1f;
+    float _cutoffAplicado = -1f;
+    bool _temFiltro;
+    bool _filtroAtivo;
 
     double _startDsp;
     bool _started;
     int _lastBeat = -1;
     int _lastHover = -1;
 
-    // ---------------------------------------------------------------- Propriedades públicas
-    /// <summary>True quando a música já começou a tocar.</summary>
-    public bool IsPlaying => _started && _ref != null && AudioSettings.dspTime >= _startDsp;
+    // cache por frame
+    bool _playing;
+    float _musicTime;
+    float _clock;
+    float _fallbackClock;
+    float _lastRawTime = -1f;
+    float _stalledFor;
+    bool _clockRunning;
 
-    /// <summary>Posição atual dentro do loop, em segundos (já considera pitch/velocidade).</summary>
-    public float MusicTime
-    {
-        get
-        {
-            if (!IsPlaying || _ref.src.clip == null) return 0f;
-            return _ref.src.timeSamples / (float)_ref.src.clip.frequency;
-        }
-    }
+    bool _prefsSujo;
+    float _prefsT;
+
+    // ---------------------------------------------------------------- Propriedades públicas
+    /// <summary>True quando a música já começou a tocar (valor atualizado 1x por frame).</summary>
+    public bool IsPlaying => _playing;
+
+    /// <summary>
+    /// True quando o relógio da música anda de verdade. No WebGL o navegador só libera o áudio
+    /// depois do primeiro clique/tecla: antes disso isto fica false e o Clock usa o relógio de reserva.
+    /// </summary>
+    public bool ClockRunning => _clockRunning;
+
+    /// <summary>Posição "crua" dentro do loop, em segundos (valor do frame; já considera pitch/velocidade).</summary>
+    public float MusicTime => _musicTime;
+
+    /// <summary>
+    /// Posição dentro do loop, em segundos, que SEMPRE anda: segue a música quando ela está rodando
+    /// e continua sozinha (na mesma velocidade) quando o áudio trava. Use este para animar no ritmo.
+    /// </summary>
+    public float Clock => _clock;
 
     public float LoopLength => (_ref != null && _ref.src.clip != null) ? _ref.src.clip.length : 76.8f;
 
     /// <summary>Posição no loop de 0 a 1 (use para girar a plataforma em sincronia).</summary>
-    public float Normalized => LoopLength > 0f ? Mathf.Repeat(MusicTime / LoopLength, 1f) : 0f;
+    public float Normalized => LoopLength > 0f ? Mathf.Repeat(_clock / LoopLength, 1f) : 0f;
 
     public float BeatLength => 60f / Mathf.Max(1f, bpm);
     public int LoopBeats => Mathf.RoundToInt(LoopLength / BeatLength);
 
     /// <summary>Progresso dentro da batida atual: 0 = acabou de bater, 1 = próxima batida.</summary>
-    public float BeatProgress => Mathf.Repeat(MusicTime / BeatLength, 1f);
+    public float BeatProgress => Mathf.Repeat(_clock / BeatLength, 1f);
+
+    /// <summary>Progresso dentro do compasso atual (0..1).</summary>
+    public float BarProgress => Mathf.Repeat(_clock / (BeatLength * Mathf.Max(1, beatsPerBar)), 1f);
 
     public float MasterVolume => master;
     public float MusicVolume => music;
@@ -145,7 +183,7 @@ public class AudioManager : MonoBehaviour
         music = PlayerPrefs.GetFloat(KeyMusic, music);
         sfx = PlayerPrefs.GetFloat(KeySfx, sfx);
 
-        _cutoff = _cutoffTarget = openCutoff;
+        _cutoff = _cutoffTarget = _cutoffAplicado = openCutoff;
         BuildLayers();
         BuildSfxPool();
 
@@ -164,35 +202,128 @@ public class AudioManager : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
+    void OnApplicationPause(bool pausado)
+    {
+        if (pausado) SalvarPrefsAgora();
+    }
+
+    void OnApplicationQuit()
+    {
+        SalvarPrefsAgora();
+    }
+
     void Update()
     {
         if (Instance != this) return;
         float dt = Time.unscaledDeltaTime;
 
+        AtualizarRelogio(dt);
+
         _duck = Mathf.MoveTowards(_duck, _duckTarget, dt * 1.5f);
         _cutoff = Mathf.MoveTowards(_cutoff, _cutoffTarget, _cutoffSpeed * dt);
         _speed = Mathf.MoveTowards(_speed, _speedTarget, _speedRate * dt);
+
+        bool pitchMudou = Mathf.Abs(_speed - _pitchAplicado) > 0.0005f;
+        if (pitchMudou) _pitchAplicado = _speed;
+
+        // Filtro: só liga quando realmente está abafando.
+        if (_temFiltro)
+        {
+            bool precisa = _cutoff < openCutoff - 1f;
+
+            if (precisa != _filtroAtivo)
+            {
+                _filtroAtivo = precisa;
+                for (int i = 0; i < StemCount; i++)
+                {
+                    var l = _layers[i];
+                    if (l == null || l.lp == null) continue;
+                    if (precisa) l.lp.cutoffFrequency = _cutoff;
+                    l.lp.enabled = precisa;
+                }
+                _cutoffAplicado = _cutoff;
+            }
+        }
+
+        bool cutoffMudou = _filtroAtivo && Mathf.Abs(_cutoff - _cutoffAplicado) > 1f;
+        if (cutoffMudou) _cutoffAplicado = _cutoff;
 
         for (int i = 0; i < StemCount; i++)
         {
             var l = _layers[i];
             if (l == null) continue;
+
             l.cur = Mathf.MoveTowards(l.cur, l.target, l.speed * dt);
 
             float v = l.cur * _duck * master * music;
             if (i == (int)Stem.Vhs) v *= vhsIntensity;
 
-            l.src.volume = v;
-            l.src.pitch = _speed;
-            l.lp.cutoffFrequency = _cutoff;
+            if (Mathf.Abs(v - l.lastVol) > 0.0005f || (v <= 0f && l.lastVol != 0f))
+            {
+                l.src.volume = v;
+                l.lastVol = v;
+            }
+
+            if (pitchMudou) l.src.pitch = _pitchAplicado;
+            if (cutoffMudou && l.lp != null) l.lp.cutoffFrequency = _cutoffAplicado;
         }
 
         UpdateBeatClock();
+
+        if (_prefsSujo && Time.unscaledTime - _prefsT > 0.6f)
+            SalvarPrefsAgora();
+    }
+
+    // ---------------------------------------------------------------- Relógio (1x por frame)
+    void AtualizarRelogio(float dt)
+    {
+        _playing = _started && _ref != null && AudioSettings.dspTime >= _startDsp;
+
+        if (_playing && _ref.src.clip != null)
+            _musicTime = _ref.src.timeSamples / (float)_ref.src.clip.frequency;
+        else
+            _musicTime = 0f;
+
+        // Relógio de reserva: anda na mesma velocidade da música.
+        _fallbackClock = Mathf.Repeat(_fallbackClock + dt * _speed, Mathf.Max(0.01f, LoopLength));
+
+        if (_playing)
+        {
+            if (Mathf.Abs(_musicTime - _lastRawTime) > 0.00001f)
+            {
+                _lastRawTime = _musicTime;
+                _stalledFor = 0f;
+                _clockRunning = true;
+            }
+            else
+            {
+                _stalledFor += dt;
+                if (_stalledFor > 0.5f) _clockRunning = false;
+            }
+        }
+        else
+        {
+            _clockRunning = false;
+            _stalledFor = 0f;
+            _lastRawTime = -1f;
+        }
+
+        if (_clockRunning)
+        {
+            _clock = _musicTime;
+            _fallbackClock = _musicTime;   // se travar de novo, continua daqui
+        }
+        else
+        {
+            _clock = _fallbackClock;
+        }
     }
 
     // ---------------------------------------------------------------- Montagem
     void BuildLayers()
     {
+        _temFiltro = Application.platform != RuntimePlatform.WebGLPlayer || filtroNoWebGL;
+
         AudioClip[] clips = { bass, arp, pad, lead, drums, fx, vhs };
         for (int i = 0; i < StemCount; i++)
         {
@@ -212,8 +343,13 @@ public class AudioManager : MonoBehaviour
             s.spatialBlend = 0f;
             s.volume = 0f;
 
-            var lp = go.AddComponent<AudioLowPassFilter>();
-            lp.cutoffFrequency = openCutoff;
+            AudioLowPassFilter lp = null;
+            if (_temFiltro)
+            {
+                lp = go.AddComponent<AudioLowPassFilter>();
+                lp.cutoffFrequency = openCutoff;
+                lp.enabled = false;   // ligado só quando abafa (Options/Pause/GameOver)
+            }
 
             _layers[i] = new Layer { src = s, lp = lp };
         }
@@ -228,6 +364,7 @@ public class AudioManager : MonoBehaviour
         int n = Mathf.Max(2, sfxPoolSize);
         _pool = new AudioSource[n];
         _poolTime = new float[n];
+        _poolEnd = new float[n];
         for (int i = 0; i < n; i++)
         {
             var go = new GameObject("Sfx_" + i);
@@ -254,12 +391,22 @@ public class AudioManager : MonoBehaviour
             l.src.PlayScheduled(_startDsp);
         }
         _lastBeat = -1;
+        _lastRawTime = -1f;
+        _stalledFor = 0f;
         _started = true;
     }
 
+    // Presets (sem alocação): ordem dos stems = Bass, Arp, Pad, Lead, Drums, Fx, Vhs
+    static readonly float[] VMenu = { 1f, 1f, 1f, 1f, 1f, 1f, 1f };
+    static readonly float[] VOptions = { 1f, 0.8f, 1f, 0.25f, 0f, 0.5f, 1f };
+    static readonly float[] VMudo = { 0f, 0f, 0f, 0f, 0f, 0f, 0f };
+    static readonly float[] VGameplay = { 1f, 1f, 0.8f, 0.5f, 1f, 0f, 1f };   // ~3,7 dB mais baixa p/ SFX e notas
+    static readonly float[] VPaused = { 1f, 0.6f, 1f, 0.2f, 0.3f, 0f, 1f };
+    static readonly float[] VGameOver = { 0.6f, 0.4f, 1f, 0f, 0f, 0f, 1f };
+
     struct Preset
     {
-        public float[] v;     // Bass, Arp, Pad, Lead, Drums, Fx, Vhs
+        public float[] v;
         public float cutoff;
         public float duck;
     }
@@ -268,21 +415,13 @@ public class AudioManager : MonoBehaviour
     {
         switch (s)
         {
-            case MusicState.Options:
-                return new Preset { v = new[] { 1f, 0.8f, 1f, 0.25f, 0f, 0.5f, 1f }, cutoff = 1800f, duck = 1f };
-            case MusicState.Starting:
-                return new Preset { v = new[] { 0f, 0f, 0f, 0f, 0f, 0f, 0f }, cutoff = openCutoff, duck = 1f };
-            case MusicState.Gameplay:
-                // música ~3,7 dB mais baixa para os SFX e notas de cor aparecerem
-                return new Preset { v = new[] { 1f, 1f, 0.8f, 0.5f, 1f, 0f, 1f }, cutoff = openCutoff, duck = 0.65f };
-            case MusicState.Paused:
-                return new Preset { v = new[] { 1f, 0.6f, 1f, 0.2f, 0.3f, 0f, 1f }, cutoff = 1400f, duck = 0.65f };
-            case MusicState.GameOver:
-                return new Preset { v = new[] { 0.6f, 0.4f, 1f, 0f, 0f, 0f, 1f }, cutoff = 2500f, duck = 0.8f };
-            case MusicState.Silent:
-                return new Preset { v = new[] { 0f, 0f, 0f, 0f, 0f, 0f, 0f }, cutoff = openCutoff, duck = 1f };
-            default: // Menu
-                return new Preset { v = new[] { 1f, 1f, 1f, 1f, 1f, 1f, 1f }, cutoff = openCutoff, duck = 1f };
+            case MusicState.Options: return new Preset { v = VOptions, cutoff = 1800f, duck = 1f };
+            case MusicState.Starting: return new Preset { v = VMudo, cutoff = openCutoff, duck = 1f };
+            case MusicState.Gameplay: return new Preset { v = VGameplay, cutoff = openCutoff, duck = 0.65f };
+            case MusicState.Paused: return new Preset { v = VPaused, cutoff = 1400f, duck = 0.65f };
+            case MusicState.GameOver: return new Preset { v = VGameOver, cutoff = 2500f, duck = 0.8f };
+            case MusicState.Silent: return new Preset { v = VMudo, cutoff = openCutoff, duck = 1f };
+            default: return new Preset { v = VMenu, cutoff = openCutoff, duck = 1f };
         }
     }
 
@@ -330,9 +469,9 @@ public class AudioManager : MonoBehaviour
     // ---------------------------------------------------------------- Relógio de batidas
     void UpdateBeatClock()
     {
-        if (!IsPlaying) return;
+        if (!_playing) return;
 
-        int cur = Mathf.FloorToInt(MusicTime / BeatLength);
+        int cur = Mathf.FloorToInt(_clock / BeatLength);
 
         if (_lastBeat < 0)
         {
@@ -412,10 +551,13 @@ public class AudioManager : MonoBehaviour
     {
         if (clip == null || _pool == null) return;
 
+        float agora = Time.unscaledTime;
+
+        // Voz livre = a que já passou do fim estimado (sem consultar isPlaying no motor).
         int idx = -1;
         for (int i = 0; i < _pool.Length; i++)
         {
-            if (!_pool[i].isPlaying) { idx = i; break; }
+            if (agora >= _poolEnd[i]) { idx = i; break; }
         }
         if (idx < 0)   // todos ocupados: rouba o mais antigo
         {
@@ -427,11 +569,15 @@ public class AudioManager : MonoBehaviour
         }
 
         var s = _pool[idx];
+        float pitch = 1f + UnityEngine.Random.Range(-pitchJitter, pitchJitter);
+
         s.clip = clip;
-        s.pitch = 1f + UnityEngine.Random.Range(-pitchJitter, pitchJitter);
+        s.pitch = pitch;
         s.volume = Mathf.Clamp01(master * sfx * gain * (1f + UnityEngine.Random.Range(-volumeJitter, volumeJitter)));
         s.Play();
-        _poolTime[idx] = Time.unscaledTime;
+
+        _poolTime[idx] = agora;
+        _poolEnd[idx] = agora + clip.length / Mathf.Max(0.1f, pitch) + 0.02f;
     }
 
     // ---------------------------------------------------------------- Volumes (ligue aos sliders)
@@ -439,17 +585,33 @@ public class AudioManager : MonoBehaviour
     {
         master = Mathf.Clamp01(v);
         PlayerPrefs.SetFloat(KeyMaster, master);
+        MarcarPrefs();
     }
 
     public void SetMusicVolume(float v)
     {
         music = Mathf.Clamp01(v);
         PlayerPrefs.SetFloat(KeyMusic, music);
+        MarcarPrefs();
     }
 
     public void SetSfxVolume(float v)
     {
         sfx = Mathf.Clamp01(v);
         PlayerPrefs.SetFloat(KeySfx, sfx);
+        MarcarPrefs();
+    }
+
+    void MarcarPrefs()
+    {
+        _prefsSujo = true;
+        _prefsT = Time.unscaledTime;
+    }
+
+    void SalvarPrefsAgora()
+    {
+        if (!_prefsSujo) return;
+        PlayerPrefs.Save();
+        _prefsSujo = false;
     }
 }

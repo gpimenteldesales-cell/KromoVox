@@ -229,7 +229,22 @@ public class GameManager : MonoBehaviour
         // Evita dois GameManagers na mesma cena.
         if (Instance != null && Instance != this)
         {
-            Destroy(gameObject);
+            Debug.LogWarning(
+                "GameManager: já existe outro GameManager (" + Instance.gameObject.name + "). " +
+                "Este (" + gameObject.name + ") será removido. Deixe só um na cena.",
+                this
+            );
+
+            // Desliga antes de destruir: assim o Start deste duplicado não chega a rodar.
+            enabled = false;
+
+            // Se o duplicado é só outro componente no MESMO objeto, destrói só o componente
+            // (destruir o objeto levaria o GameManager verdadeiro junto).
+            if (Instance.gameObject == gameObject)
+                Destroy(this);
+            else
+                Destroy(gameObject);
+
             return;
         }
 
@@ -359,8 +374,21 @@ public class GameManager : MonoBehaviour
     // RODADA
     // =========================================================
 
-    public void NovaRodada()
+    // Privado de propósito: só o fluxo do próprio GameManager (preparo e vitória) começa rodadas.
+    // Se algo de fora (um UnityEvent no Inspector, por exemplo) chamasse isto, a rodada contava em dobro.
+    private void NovaRodada()
     {
+        // Guarda: nunca começa uma rodada por cima de outra que ainda está valendo.
+        if (roundActive)
+        {
+            Debug.LogWarning(
+                $"GameManager: NovaRodada chamada com a rodada {rodada} ainda ativa. Chamada ignorada. " +
+                "Clique neste aviso para ver no stack trace quem chamou.",
+                this
+            );
+            return;
+        }
+
         rodada++;
         rodadaUid++;
         fimDeJogo = false;
