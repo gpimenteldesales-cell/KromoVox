@@ -17,6 +17,11 @@ using UnityEngine.InputSystem;
 ///
 /// O que o jogo "pede" fica em InputAtual (x = direita, y = frente), para outros scripts
 /// (como o PlayerJuice) usarem exatamente a mesma leitura.
+///
+/// CORRECAO DE COLISAO: o movimento agora e feito por VELOCIDADE (rb.linearVelocity) e nao por
+/// MovePosition. MovePosition num Rigidbody nao-kinematic funciona como teleporte e atravessa
+/// paredes finas quando o jogador empurra com forca. Com velocidade, a fisica bloqueia o cubo
+/// nas paredes e ele desliza ao longo delas.
 /// </summary>
 [RequireComponent(typeof(Rigidbody))]
 public class PlayerMove : MonoBehaviour
@@ -62,6 +67,9 @@ public class PlayerMove : MonoBehaviour
 
         // Move em FixedUpdate mas desenha a cada frame: sem isso o cubo "treme" em telas de 120/144 Hz.
         rb.interpolation = RigidbodyInterpolation.Interpolate;
+
+        // Detecção contínua: não atravessa colliders finos, mesmo em velocidade alta.
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
 
         if (referenciaCamera == null && Camera.main != null)
             referenciaCamera = Camera.main.transform;
@@ -112,9 +120,11 @@ public class PlayerMove : MonoBehaviour
 
     void FixedUpdate()
     {
-        // Move o Rigidbody de forma segura com a física (colisores e triggers continuam funcionando)
-        Vector3 novaPosicao = rb.position + direcaoMovimento * velocidade * Time.fixedDeltaTime;
-        rb.MovePosition(novaPosicao);
+        // Velocidade em vez de MovePosition: a física bloqueia nas paredes e o cubo desliza ao longo delas.
+        // Mantém o Y atual para a gravidade continuar funcionando.
+        Vector3 vel = direcaoMovimento * velocidade;
+        vel.y = rb.linearVelocity.y;   // no Unity antigo (antes do 6), troque por rb.velocity
+        rb.linearVelocity = vel;
     }
 
     void OnDisable()
@@ -122,6 +132,9 @@ public class PlayerMove : MonoBehaviour
         suave = Vector2.zero;
         InputAtual = Vector2.zero;
         direcaoMovimento = Vector3.zero;
+
+        if (rb != null)
+            rb.linearVelocity = new Vector3(0f, rb.linearVelocity.y, 0f);
     }
 
     // ------------------------------------------------------------------
