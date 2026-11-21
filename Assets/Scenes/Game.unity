@@ -1988,18 +1988,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8632370c5cbc39c4ca544674d3c4716b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameHUD
-  textoRodada: ROUND
-  textoPreparo: GET READY
-  textoAlvo: TARGET
-  textoRegra: STAND ON THE TILE THAT MATCHES THE TARGET!
-  textoControles: 'MOVE: WASD / ARROWS'
-  textoControlesGamepad: 'MOVE: LEFT STICK / D-PAD'
-  textoControlesToque: 'MOVE: TOUCH PAD'
-  textoDerrota: TIME'S UP!
-  textoDerrotaExplicacao: THE TILE THAT KEPT ITS COLOR WAS THE ANSWER
-  textoPontos: SCORE
-  textoRecorde: BEST
-  textoNovoRecorde: NEW BEST!
+  textoRodada: RODADA
+  textoPreparo: 'PREPARE-SE '
+  textoAlvo: ALVO
+  textoRegra: FIQUE SOBRE O PISO QUE CORRESPONDE AO ALVO!
+  textoControles: 'MOVIMENTAR: WASD / SETAS '
+  textoControlesGamepad: 'MOVIMENTAR: ALAVANCA ESQUERDA / D-PAD '
+  textoControlesToque: "MOVIMENTAR: ANAL\xD3GICO "
+  textoDerrota: 'ACABOU O TEMPO! '
+  textoDerrotaExplicacao: 'O AZULEJO QUE MANTEVE SUA COR FOI A RESPOSTA '
+  textoPontos: "PONTUA\xC7\xC3O"
+  textoRecorde: MELHOR
+  textoNovoRecorde: NOVO RECORDE!
   textoCombo: COMBO
   rodadasComDica: 3
   margemDica: 30
