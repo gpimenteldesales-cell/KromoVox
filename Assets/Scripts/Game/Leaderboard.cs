@@ -14,7 +14,7 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// PLACAR TOP 10 do KROMOVOX, estilo arcade (iniciais de 3 letras), montado 100% por codigo.
 ///
-/// COMO USAR: NADA. Ao entrar na cena do jogo ele se cria sozinho (como o MobileControls).
+/// COMO USAR: NADA. Ao entrar na cena do jogo ele se cria sozinho.
 /// Se quiser mudar opcoes no Inspector, coloque o script em um GameObject vazio da cena do jogo.
 ///
 /// O QUE FAZ:
@@ -24,7 +24,7 @@ using UnityEngine.InputSystem;
 ///      TECLADO: digite as letras (A-Z), SETAS cima/baixo trocam a letra, esquerda/direita movem o cursor,
 ///               BACKSPACE volta, ENTER confirma.
 ///      CONTROLE: direcional (cima/baixo letra, esquerda/direita cursor) e botao A/X confirma.
-///      TOQUE/MOUSE: toque numa letra para trocar, toque em OK para confirmar.
+///      MOUSE: clique numa letra para trocar, clique em OK para confirmar.
 ///  - Se clicar em TRY AGAIN no meio, as iniciais atuais sao salvas (nao perde a pontuacao).
 ///  - Salva em PlayerPrefs (no WebGL fica no navegador: use sempre o mesmo navegador/endereco).
 ///  - Comeca com algumas pontuacoes "de desafio" (semearRanking) para dar o que bater.
@@ -46,7 +46,7 @@ public class Leaderboard : MonoBehaviour
     [Header("Ranking")]
     [Range(3, 10)] public int maxEntradas = 10;
     [Tooltip("Na primeira vez (sem nada salvo), preenche algumas pontuacoes de desafio.")]
-    public bool semearRanking = true;
+    public bool semearRanking = false;
 
     [Header("Quando mostrar")]
     [Tooltip("Mostra o placar tambem no preparo antes da rodada 1 (GET READY).")]
@@ -119,7 +119,7 @@ public class Leaderboard : MonoBehaviour
     // controle de entrada durante a digitacao
     GameObject selAntes;
     PlayerMove pm;
-    bool pmTec, pmCon, pmTou;
+    bool pmTec, pmCon;
 
     // ------------------------------------------------------------------ criacao automatica
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -324,10 +324,8 @@ public class Leaderboard : MonoBehaviour
         {
             pmTec = pm.usarTeclado;
             pmCon = pm.usarControle;
-            pmTou = pm.usarToque;
             pm.usarTeclado = false;
             pm.usarControle = false;
-            pm.usarToque = false;
         }
     }
 
@@ -339,7 +337,6 @@ public class Leaderboard : MonoBehaviour
         {
             pm.usarTeclado = pmTec;
             pm.usarControle = pmCon;
-            pm.usarToque = pmTou;
         }
         pm = null;
 

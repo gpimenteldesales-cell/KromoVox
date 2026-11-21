@@ -3394,13 +3394,6 @@ MonoBehaviour:
     A cada rodada o tempo fica mais curto!
   rodapeProximo: 'ENTER / CLIQUE: CONTINUAR  |  ESC: PULAR'
   rodapeComecar: 'ENTER / CLIQUE: JOGAR'
-  texto2Toque: Toque e arraste no CONTROLE do canto de baixo para mover. Pode ir
-    na diagonal. Experimente agora!
-  rotuloArrastar: ARRASTE PARA MOVER
-  rodapeProximoToque: 'TOQUE: CONTINUAR'
-  rodapePadToque: 'TOQUE NO MEIO DA TELA: CONTINUAR'
-  rodapeComecarToque: 'TOQUE: JOGAR'
-  rotuloPular: PULAR
   font: {fileID: 11400000, guid: 45a9d96e27149a2459637c969df74209, type: 2}
   sortingOrder: 100
   corDim: {r: 0, g: 0, b: 0, a: 0.62}
@@ -4456,7 +4449,7 @@ Transform:
   m_GameObject: {fileID: 1658480743}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -6.94, z: 0}
+  m_LocalPosition: {x: 0, y: -9.13, z: 0}
   m_LocalScale: {x: 4, y: 4, z: 4}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -4478,7 +4471,6 @@ MonoBehaviour:
   referenciaCamera: {fileID: 330585546}
   usarTeclado: 1
   usarControle: 1
-  usarToque: 1
   entradaCrua: 1
   suavizacao: 14
   zonaMorta: 0.2
@@ -4853,7 +4845,6 @@ MonoBehaviour:
   referenciaCamera: {fileID: 330585546}
   usarTeclado: 1
   usarControle: 1
-  usarToque: 1
   entradaCrua: 1
   suavizacao: 14
   zonaMorta: 0.2

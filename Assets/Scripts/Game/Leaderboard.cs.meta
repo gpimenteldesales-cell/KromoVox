@@ -1,2 +1,12 @@
 fileFormatVersion: 2
 guid: eb84fe1bed912b747980b56b06aba5f0
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - fontePixel: {fileID: 11400000, guid: 7e7100c8671fab045a4684294a39706b, type: 2}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

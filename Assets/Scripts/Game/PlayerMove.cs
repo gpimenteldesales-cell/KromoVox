@@ -6,14 +6,12 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// Movimento do cubo. Aceita, ao mesmo tempo:
 ///  - TECLADO: WASD / setas;
-///  - CONTROLE: analogico esquerdo e direcional (PS4/DualShock, Xbox, etc.);
-///  - TOQUE: o pad de botoes do MobileControls (celular / tablet).
+///  - CONTROLE: analogico esquerdo e direcional (PS4/DualShock, Xbox, etc.).
 ///
 /// Funciona em Windows/Mac/Linux e em WebGL.
 ///  - Com o Input System novo (Active Input Handling = Both ou Input System Package):
 ///    teclado + controle. E o unico jeito do controle funcionar no WebGL.
 ///  - Com so o Input Manager antigo: teclado (e o controle que o Input Manager enxergar).
-///  - O toque funciona nos dois casos.
 ///
 /// O que o jogo "pede" fica em InputAtual (x = direita, y = frente), para outros scripts
 /// (como o PlayerJuice) usarem exatamente a mesma leitura.
@@ -36,7 +34,6 @@ public class PlayerMove : MonoBehaviour
     [Header("Entradas aceitas")]
     public bool usarTeclado = true;
     public bool usarControle = true;
-    public bool usarToque = true;
 
     [Header("Sensação")]
     [Tooltip("LIGADO: o cubo para na hora ao soltar (preciso, recomendado). " +
@@ -82,7 +79,6 @@ public class PlayerMove : MonoBehaviour
 
         if (usarTeclado) alvo = MaiorMagnitude(alvo, LerTeclado());
         if (usarControle) alvo = MaiorMagnitude(alvo, LerControle());
-        if (usarToque) alvo = MaiorMagnitude(alvo, MobileControls.Direcao);
 
         alvo = Vector2.ClampMagnitude(alvo, 1f);
 
