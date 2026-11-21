@@ -425,6 +425,7 @@ MonoBehaviour:
   sfxPoolSize: 10
   maxMusicSpeed: 1.25
   openCutoff: 22000
+  filtroNoWebGL: 1
 --- !u!4 &163901844
 Transform:
   m_ObjectHideFlags: 0
@@ -2486,7 +2487,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: v0.7.5 alpha
+  m_text: v0.8.9 alpha
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 7e7100c8671fab045a4684294a39706b, type: 2}
   m_sharedMaterial: {fileID: 8547012136375342751, guid: 7e7100c8671fab045a4684294a39706b, type: 2}
@@ -3424,7 +3425,7 @@ MonoBehaviour:
   duracaoVoxel: 0.55
   atrasoPorLetra: 0.11
   variacaoAtraso: 0.18
-  somDasLetras: 1
+  somDasLetras: 0
   pulsoNaBatida: 0.035
   balanco: 0.22
   alturaDaOnda: 0.8
@@ -6676,9 +6677,9 @@ SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 707880417}
-  - {fileID: 163901844}
   - {fileID: 896569988}
-  - {fileID: 1201783070}
+  - {fileID: 163901844}
   - {fileID: 304359553}
   - {fileID: 205201196}
+  - {fileID: 1201783070}
   - {fileID: 1282891059}

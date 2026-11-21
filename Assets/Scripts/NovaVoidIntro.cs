@@ -34,6 +34,11 @@ public class NovaVoidIntro : MonoBehaviour
     [Header("Audio (opcional)")]
     public AudioClip sting;                          // som de impacto/sintetizador
 
+    [Header("Toque para iniciar (WebGL / celular)")]
+    [Tooltip("O navegador so libera o audio depois de um toque. Com isto ligado, a intro espera um toque antes de comecar (so no build WebGL), e assim o som da intro e a musica funcionam no celular.")]
+    public bool exigirToqueNoWebGL = true;
+    public string textoToque = "TAP TO START";
+
     // --- runtime ---
     CanvasGroup content;
     RectTransform contentRt;
@@ -41,8 +46,9 @@ public class NovaVoidIntro : MonoBehaviour
     CanvasGroup dotGroup;
     RawImage scanlines;
     Image flash;
-    TextMeshProUGUI txtMain, txtPurple, txtGreen, txtSub;
+    TextMeshProUGUI txtMain, txtPurple, txtGreen, txtSub, txtToque;
     AudioSource audioSrc;
+    bool aguardandoToque;
     readonly List<Voxel> voxels = new List<Voxel>();
     bool leaving;
     float elapsed;
@@ -72,7 +78,7 @@ public class NovaVoidIntro : MonoBehaviour
     void Update()
     {
         elapsed += Time.unscaledDeltaTime;
-        if (skippable && !leaving && elapsed > 0.3f && SkipPressed())
+        if (skippable && !leaving && !aguardandoToque && elapsed > 0.3f && SkipPressed())
         {
             StopAllCoroutines();
             StartCoroutine(Exit(0.2f));
@@ -96,8 +102,56 @@ public class NovaVoidIntro : MonoBehaviour
     // ------------------------------------------------------------------
     // SEQUENCIA
     // ------------------------------------------------------------------
+    /// <summary>True se esta intro precisa esperar um toque (so no build WebGL).</summary>
+    bool ExigeToque()
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        return exigirToqueNoWebGL;
+#else
+        return false;
+#endif
+    }
+
+    /// <summary>Toque/clique vale ao SOLTAR (o iOS so libera o audio no fim do toque). Teclado: ao apertar.</summary>
+    bool GestoDeInicio()
+    {
+#if ENABLE_INPUT_SYSTEM
+        var k = Keyboard.current;
+        var m = Mouse.current;
+        var t = Touchscreen.current;
+        if ((k != null && k.anyKey.wasPressedThisFrame)
+            || (m != null && m.leftButton.wasReleasedThisFrame)
+            || (t != null && t.primaryTouch.press.wasReleasedThisFrame))
+            return true;
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.anyKeyDown || Input.GetMouseButtonUp(0))
+            return true;
+        for (int i = 0; i < Input.touchCount; i++)
+            if (Input.GetTouch(i).phase == UnityEngine.TouchPhase.Ended)
+                return true;
+#endif
+        return false;
+    }
+
     IEnumerator Run()
     {
+        // 0) espera um toque para o navegador liberar o audio (celular)
+        if (ExigeToque())
+        {
+            aguardandoToque = true;
+            txtToque.gameObject.SetActive(true);
+
+            while (!GestoDeInicio())
+            {
+                txtToque.alpha = 0.45f + 0.55f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * 2.5f));
+                yield return null;
+            }
+
+            txtToque.gameObject.SetActive(false);
+            aguardandoToque = false;
+        }
+
         // 1) scanlines aparecem
         yield return Tween(0.4f, t => scanlines.color = new Color(1, 1, 1, Mathf.Lerp(0f, scanlineAlpha, t)));
 
@@ -287,10 +341,12 @@ public class NovaVoidIntro : MonoBehaviour
         txtGreen = MakeText(contentRt, "LogoGreen", studioName, 190f, green, new Vector2(0, 40));
         txtMain = MakeText(contentRt, "LogoMain", studioName, 190f, Color.white, new Vector2(0, 40));
         txtSub = MakeText(contentRt, "Subtitle", subtitle, 56f, green, new Vector2(0, -120));
+        txtToque = MakeText(contentRt, "TapToStart", textoToque, 64f, Color.white, new Vector2(0, 0));
         txtPurple.gameObject.SetActive(false);
         txtGreen.gameObject.SetActive(false);
         txtMain.gameObject.SetActive(false);
         txtSub.gameObject.SetActive(false);
+        txtToque.gameObject.SetActive(false);
 
         // Scanlines VHS (textura 1x4 repetida)
         var tex = new Texture2D(1, 4, TextureFormat.RGBA32, false)

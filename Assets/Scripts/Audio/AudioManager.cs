@@ -1,5 +1,8 @@
 using System;
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 /// <summary>
 /// KROMOVOX - gerenciador de audio unico (musica em stems + SFX + relogio de batidas).
@@ -129,6 +132,7 @@ public class AudioManager : MonoBehaviour
 
     bool _prefsSujo;
     float _prefsT;
+    float _ultimoReinicio = -10f;   // para o "destravar no toque" nao reiniciar a musica em sequencia
 
     // ---------------------------------------------------------------- Propriedades públicas
     /// <summary>True quando a música já começou a tocar (valor atualizado 1x por frame).</summary>
@@ -218,6 +222,7 @@ public class AudioManager : MonoBehaviour
         float dt = Time.unscaledDeltaTime;
 
         AtualizarRelogio(dt);
+        DestravarAudioNoGesto();
 
         _duck = Mathf.MoveTowards(_duck, _duckTarget, dt * 1.5f);
         _cutoff = Mathf.MoveTowards(_cutoff, _cutoffTarget, _cutoffSpeed * dt);
@@ -381,14 +386,24 @@ public class AudioManager : MonoBehaviour
     /// <summary>Reinicia todos os stems do começo, alinhados (começa com o "hit" do sting).</summary>
     public void RestartMusic()
     {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        // WebGL: agendar no futuro (PlayScheduled) com o audio ainda travado pelo navegador pode
+        // nunca tocar no celular. Aqui os stems comecam na hora, no mesmo frame.
+        _startDsp = AudioSettings.dspTime;
+#else
         _startDsp = AudioSettings.dspTime + 0.25;
+#endif
         for (int i = 0; i < StemCount; i++)
         {
             var l = _layers[i];
             if (l == null) continue;
             l.src.Stop();
             l.src.timeSamples = 0;
+#if UNITY_WEBGL && !UNITY_EDITOR
+            l.src.Play();
+#else
             l.src.PlayScheduled(_startDsp);
+#endif
         }
         _lastBeat = -1;
         _lastRawTime = -1f;
@@ -613,5 +628,49 @@ public class AudioManager : MonoBehaviour
         if (!_prefsSujo) return;
         PlayerPrefs.Save();
         _prefsSujo = false;
+    }
+
+    // ---------------------------------------------------------------- Destravar audio (celular / WebGL)
+    /// <summary>
+    /// No celular o navegador so libera o audio depois de um toque. Se a musica foi iniciada antes disso,
+    /// o relogio dela fica parado. Quando o jogador toca/clica/aperta uma tecla e a musica ainda esta
+    /// parada, ela e reiniciada (os stems comecam juntos de novo). Se ja esta tocando, nao faz nada.
+    /// </summary>
+    void DestravarAudioNoGesto()
+    {
+        if (!_started || _clockRunning) return;
+        if (Time.unscaledTime - _ultimoReinicio < 0.6f) return;
+        if (!GestoDoUsuario()) return;
+
+        _ultimoReinicio = Time.unscaledTime;
+        RestartMusic();
+    }
+
+    /// <summary>
+    /// Toque/clique: vale ao SOLTAR (o iOS so libera o audio no fim do toque). Teclado: ao apertar.
+    /// </summary>
+    static bool GestoDoUsuario()
+    {
+#if ENABLE_INPUT_SYSTEM
+        var k = Keyboard.current;
+        var m = Mouse.current;
+        var t = Touchscreen.current;
+
+        if ((k != null && k.anyKey.wasPressedThisFrame)
+            || (m != null && m.leftButton.wasReleasedThisFrame)
+            || (t != null && t.primaryTouch.press.wasReleasedThisFrame))
+            return true;
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.anyKeyDown || Input.GetMouseButtonUp(0))
+            return true;
+
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            if (Input.GetTouch(i).phase == UnityEngine.TouchPhase.Ended)
+                return true;
+        }
+#endif
+        return false;
     }
 }

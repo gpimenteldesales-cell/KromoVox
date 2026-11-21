@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -16,8 +17,10 @@ using UnityEngine.InputSystem;
 ///  - Aparece sozinho em celular/tablet, ou no primeiro toque (modo Auto).
 ///  - Some no Game Over e fica sem pegar clique quando esta escondido.
 ///
-/// COMO USAR: coloque este script em qualquer objeto da cena do jogo (ex.: ControlsScripts).
-/// Precisa de um EventSystem na cena (o seu ja tem).
+/// NOVO: SE ESQUECER DE COLOCAR NA CENA, ELE SE CRIA SOZINHO. Em qualquer cena que tenha um
+/// PlayerMove e nenhum MobileControls, um objeto "MobileControls (auto)" e criado em modo Auto.
+/// Se voce colocar um na cena (para mudar as opcoes no Inspector), o automatico nao e criado.
+///
 /// Para testar no Editor, ponha Modo = SempreMostrar (o mouse faz o papel do dedo).
 /// </summary>
 public class MobileControls : MonoBehaviour
@@ -66,6 +69,25 @@ public class MobileControls : MonoBehaviour
     static Sprite spTriangulo;
 
     // ------------------------------------------------------------------
+    // CRIACAO AUTOMATICA (rede de seguranca)
+    // ------------------------------------------------------------------
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    static void Iniciar()
+    {
+        SceneManager.sceneLoaded += (cena, modoCarga) => Garantir();
+        Garantir();
+    }
+
+    static void Garantir()
+    {
+        if (FindFirstObjectByType<MobileControls>() != null) return;
+        if (FindFirstObjectByType<PlayerMove>() == null) return;   // so nas cenas de jogo
+
+        var go = new GameObject("MobileControls (auto)");
+        go.AddComponent<MobileControls>();
+    }
+
+    // ------------------------------------------------------------------
     void Awake()
     {
         Direcao = Vector2.zero;
@@ -102,7 +124,7 @@ public class MobileControls : MonoBehaviour
         float dt = Time.unscaledDeltaTime;
 
         // Modo Auto: aparece no primeiro toque (celular em que o navegador nao se identifica como mobile).
-        if (modo == Modo.Auto && !visivel && ToqueNesteFrame())
+        if (modo == Modo.Auto && !visivel && (ToqueNesteFrame() || TemTelaDeToque()))
         {
             ToqueDetectado = true;
             visivel = true;
@@ -135,8 +157,25 @@ public class MobileControls : MonoBehaviour
         {
             case Modo.SempreMostrar: return true;
             case Modo.Nunca: return false;
-            default: return Application.isMobilePlatform || ToqueDetectado;
+            default: return Application.isMobilePlatform || ToqueDetectado || TemTelaDeToque();
         }
+    }
+
+    /// <summary>
+    /// True se o aparelho declara tela de toque. Cobre celulares em que o navegador (WebGL)
+    /// nao se identifica como mobile para a Unity. No PC comum continua false.
+    /// </summary>
+    static bool TemTelaDeToque()
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+#if ENABLE_INPUT_SYSTEM
+        if (Touchscreen.current != null) return true;
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.touchSupported) return true;
+#endif
+#endif
+        return false;
     }
 
     static bool ToqueNesteFrame()
