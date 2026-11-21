@@ -85,7 +85,7 @@ public class MainMenu : MonoBehaviour
 
     public void OpenOptions()
     {
-        if (mainPanel != null) mainPanel.SetActive(false);
+        if (mainPanel != null) mainPanel.SetActive(true);
         if (optionsPanel != null) optionsPanel.SetActive(true);
 
         Selecionar(volumeSlider != null ? volumeSlider.gameObject : null);

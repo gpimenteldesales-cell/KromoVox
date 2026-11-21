@@ -437,6 +437,8 @@ MonoBehaviour:
   voxelCount: 56
   scanlineAlpha: 0.35
   sting: {fileID: 8300000, guid: c6fc43c5be305154291a6a8ffe250aff, type: 3}
+  exigirToqueNoWebGL: 1
+  textoToque: "TOQUE PARA COME\xC7AR!"
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

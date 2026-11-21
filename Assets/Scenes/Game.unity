@@ -2691,10 +2691,10 @@ MonoBehaviour:
   painelGameOver: {fileID: 1427552878}
   nomeCenaMenu: MainMenu
   textoTitulo: GAME OVER
-  textoPontos: SCORE
-  textoRecorde: BEST
-  textoNovoRecorde: NEW BEST!
-  textoTentar: TRY AGAIN
+  textoPontos: PONTOS
+  textoRecorde: RECORDE
+  textoNovoRecorde: NOVO RECORDE!
+  textoTentar: TENTAR DE NOVO
   textoMenu: MENU
   atraso: 0.6
   duracaoFade: 0.35
@@ -2787,7 +2787,7 @@ MonoBehaviour:
     m_ColorMultiplier: 1
     m_FadeDuration: 0.1
   m_SpriteState:
-    m_HighlightedSprite: {fileID: 21300000, guid: 5daf723a9040090439cd924d3d658ffc, type: 3}
+    m_HighlightedSprite: {fileID: 21300000, guid: 123be8a62ee82fa4d991c138be26798c, type: 3}
     m_PressedSprite: {fileID: 0}
     m_SelectedSprite: {fileID: 0}
     m_DisabledSprite: {fileID: 0}
@@ -2834,7 +2834,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 6f4441b7b1452dd4d90e2ab2c3809cde, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 216ae1ebabe323e4c95560ae938f3051, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -3382,18 +3382,25 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TutorialOverlay
   forcarMostrar: 1
   atrasoInicial: 0.9
-  titulo1: FIND THE COLOR
-  texto1: Stand on the tile that matches the TARGET color at the top of the screen.
-  rotuloAlvo: TARGET
-  rotuloIgual: MATCH!
-  titulo2: MOVE YOUR CUBE
-  texto2: Use WASD or the ARROW KEYS. Try them now!
-  rotuloOu: OR
-  titulo3: BEAT THE CLOCK
-  texto3: When the timer ends, you must be standing on the matching tile. Every round
-    is faster!
-  rodapeProximo: 'SPACE / CLICK: NEXT  |  ESC: SKIP'
-  rodapeComecar: 'SPACE / CLICK: START'
+  titulo1: ENCONTRE A COR
+  texto1: Fique em cima do bloco que tem a mesma cor da COR ALVO, no topo da tela.
+  rotuloAlvo: COR ALVO
+  rotuloIgual: ACHOU!
+  titulo2: MOVA SEU CUBO
+  texto2: Use W A S D ou as SETAS. Experimente agora!
+  rotuloOu: OU
+  titulo3: CORRA CONTRA O TEMPO
+  texto3: Quando o tempo acabar, o seu cubo tem que estar no bloco da cor certa.
+    A cada rodada o tempo fica mais curto!
+  rodapeProximo: 'ENTER / CLIQUE: CONTINUAR  |  ESC: PULAR'
+  rodapeComecar: 'ENTER / CLIQUE: JOGAR'
+  texto2Toque: Toque e arraste no CONTROLE do canto de baixo para mover. Pode ir
+    na diagonal. Experimente agora!
+  rotuloArrastar: ARRASTE PARA MOVER
+  rodapeProximoToque: 'TOQUE: CONTINUAR'
+  rodapePadToque: 'TOQUE NO MEIO DA TELA: CONTINUAR'
+  rodapeComecarToque: 'TOQUE: JOGAR'
+  rotuloPular: PULAR
   font: {fileID: 11400000, guid: 45a9d96e27149a2459637c969df74209, type: 2}
   sortingOrder: 100
   corDim: {r: 0, g: 0, b: 0, a: 0.62}
@@ -5209,7 +5216,7 @@ MonoBehaviour:
     m_ColorMultiplier: 1
     m_FadeDuration: 0.1
   m_SpriteState:
-    m_HighlightedSprite: {fileID: 21300000, guid: 960dec2b54299b741949e0fdd6e5828c, type: 3}
+    m_HighlightedSprite: {fileID: 21300000, guid: e914cf8f38078c9438c1270da8f52df5, type: 3}
     m_PressedSprite: {fileID: 0}
     m_SelectedSprite: {fileID: 0}
     m_DisabledSprite: {fileID: 0}
@@ -5256,7 +5263,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 5550e78113d20d74ebecd4310e0dfe34, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 5644c426e690be147bded9f618c602ad, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
